@@ -4135,6 +4135,7 @@ export class AgentManager {
   ): Promise<void> {
     if (event.type === "provider_subagent") {
       const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
+      this.syncIdleBackendTimer(agent);
       this.dispatch({ type: "provider_subagent", event: update });
       return;
     }

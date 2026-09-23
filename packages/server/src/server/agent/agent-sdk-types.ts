@@ -666,6 +666,8 @@ export interface AgentSession {
   readonly provider: AgentProvider;
   readonly id: string | null;
   readonly capabilities: AgentCapabilityFlags;
+  /** The provider can reopen this persisted session after releasing its idle runtime. */
+  readonly idleBackendEvictionEligible?: boolean;
   readonly features?: AgentFeature[];
   /** New provider-owned rows to commit on registration. streamHistory must also
    * replay them at their original timestamps; restored sessions omit old rows. */

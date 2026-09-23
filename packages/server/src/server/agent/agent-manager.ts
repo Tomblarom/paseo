@@ -502,6 +502,12 @@ type ActiveManagedAgent =
   | ManagedAgentRunning
   | ManagedAgentError;
 
+interface AgentCloseOptions {
+  agentId: string;
+  shouldClose?: (agent: ActiveManagedAgent) => boolean;
+  onClose?: (agent: ActiveManagedAgent) => void;
+}
+
 type LiveManagedAgent = ActiveManagedAgent;
 type AgentLabelPatch = Record<string, string | null>;
 
@@ -1758,14 +1764,10 @@ export class AgentManager {
   }
 
   closeAgent(agentId: string): Promise<void> {
-    return this.closeAgentWhen(agentId, () => true);
+    return this.closeAgentWhen({ agentId });
   }
 
-  private closeAgentWhen(
-    agentId: string,
-    shouldClose: (agent: ActiveManagedAgent) => boolean,
-    onClose?: (agent: ActiveManagedAgent) => void,
-  ): Promise<void> {
+  private closeAgentWhen({ agentId, shouldClose, onClose }: AgentCloseOptions): Promise<void> {
     const existing = this.inFlightAgentCloses.get(agentId);
     if (existing) {
       return existing;
@@ -1774,7 +1776,9 @@ export class AgentManager {
     const close = this.runLifecycleMutation(agentId, async () => {
       // A preceding reload or archive may already have closed the durable agent.
       const agent = this.agents.get(agentId);
-      if (agent && shouldClose(agent)) await this.closeAgentRuntime(agentId, shouldClose, onClose);
+      if (agent && (!shouldClose || shouldClose(agent))) {
+        await this.closeAgentRuntime({ agentId, shouldClose, onClose });
+      }
     });
     this.inFlightAgentCloses.set(agentId, close);
     const clearClose = () => {
@@ -1835,16 +1839,17 @@ export class AgentManager {
     const idleSince = Date.now();
     const timer = setTimeout(() => {
       this.idleBackendTimers.delete(agent.id);
-      void this.closeAgentWhen(
-        agent.id,
-        (current) => current.session === session && this.isIdleBackendEvictionCandidate(current),
-        (current) => {
+      void this.closeAgentWhen({
+        agentId: agent.id,
+        shouldClose: (current) =>
+          current.session === session && this.isIdleBackendEvictionCandidate(current),
+        onClose: (current) => {
           this.logger.info(
             { agentId: current.id, provider: current.provider, idleMs: Date.now() - idleSince },
             "Evicting idle Codex backend",
           );
         },
-      )
+      })
         .catch((error) => {
           this.logger.warn({ err: error, agentId: agent.id }, "Failed to evict idle Codex backend");
         })
@@ -1857,11 +1862,11 @@ export class AgentManager {
     this.idleBackendTimers.set(agent.id, { session, timer });
   }
 
-  private async closeAgentRuntime(
-    agentId: string,
-    shouldClose?: (agent: ActiveManagedAgent) => boolean,
-    onClose?: (agent: ActiveManagedAgent) => void,
-  ): Promise<void> {
+  private async closeAgentRuntime({
+    agentId,
+    shouldClose,
+    onClose,
+  }: AgentCloseOptions): Promise<void> {
     const agent = this.requireAgent(agentId);
     this.logger.trace(
       {
@@ -1959,7 +1964,7 @@ export class AgentManager {
 
     const { archivedAt } = await this.markRecordArchived(stored, requestedArchivedAt);
     agent.updatedAt = new Date(archivedAt);
-    await this.closeAgentRuntime(agentId);
+    await this.closeAgentRuntime({ agentId });
     await this.syncNativeArchiveState(stored.provider, stored.persistence, "archive");
     this.discardRetainedAgentState(agentId);
 
@@ -2426,7 +2431,7 @@ export class AgentManager {
 
     // Close and native restore share the lifecycle lane with persisted resume.
     // No new history or interactive runtime can acquire the writer between them.
-    if (this.agents.has(agentId)) await this.closeAgentRuntime(agentId);
+    if (this.agents.has(agentId)) await this.closeAgentRuntime({ agentId });
     await this.syncNativeArchiveState(record.provider, record.persistence, "restore");
 
     await registry.upsert({

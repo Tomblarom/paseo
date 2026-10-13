@@ -1842,12 +1842,18 @@ export class AgentManager {
     if (agent && !this.runs.hasRun(agentId)) this.syncIdleBackendTimer(agent);
   }
 
-  private settleTerminalRun(agentId: string, turnId: string | undefined): void {
+  private settleTerminalRun({
+    agentId,
+    turnId,
+  }: {
+    agentId: string;
+    turnId: string | undefined;
+  }): void {
     this.runs.settleTerminalRun(agentId, turnId);
     this.syncIdleBackendTimerAfterRun(agentId);
   }
 
-  private settleForegroundRun(agentId: string, token: string): void {
+  private settleForegroundRun({ agentId, token }: { agentId: string; token: string }): void {
     this.runs.settleForegroundRun(agentId, token);
     this.syncIdleBackendTimerAfterRun(agentId);
   }
@@ -2709,7 +2715,7 @@ export class AgentManager {
         pendingRun.start = { status: "failed", error: error.message };
         agent.pendingReplacement = false;
         if (!agent.activeForegroundTurnId) agent.lifecycle = "idle";
-        this.settleForegroundRun(agentId, pendingRun.token);
+        this.settleForegroundRun({ agentId, token: pendingRun.token });
         throw error;
       }
       agent.pendingReplacement = false;
@@ -2727,7 +2733,7 @@ export class AgentManager {
         error: errorMsg,
       });
       this.finalizeForegroundTurn(agent);
-      this.settleForegroundRun(agentId, pendingRun.token);
+      this.settleForegroundRun({ agentId, token: pendingRun.token });
       throw error;
     }
   }
@@ -2857,7 +2863,7 @@ export class AgentManager {
         if (turnStream) {
           this.runs.deleteWaiter(agent, turnStream.waiter);
         }
-        this.settleForegroundRun(agentId, pendingRun.token);
+        this.settleForegroundRun({ agentId, token: pendingRun.token });
         if (!agent.activeForegroundTurnId) {
           await this.refreshRuntimeInfo(agent);
         }
@@ -3318,7 +3324,7 @@ export class AgentManager {
         { agentId, kind: run.kind },
         "cancelAgentRun: acknowledged pending turn still active after timeout, clearing it",
       );
-      this.settleForegroundRun(agentId, run.token);
+      this.settleForegroundRun({ agentId, token: run.token });
       if (!agent.pendingReplacement) {
         agent.lifecycle = "idle";
         this.touchUpdatedAt(agent);
@@ -3456,7 +3462,7 @@ export class AgentManager {
       );
       throw error;
     } finally {
-      this.settleForegroundRun(agentId, lock.token);
+      this.settleForegroundRun({ agentId, token: lock.token });
     }
   }
 
@@ -4490,7 +4496,7 @@ export class AgentManager {
 
     if (!options?.fromHistory) {
       if (isTurnTerminalEvent(event)) {
-        this.settleTerminalRun(agent.id, eventTurnId);
+        this.settleTerminalRun({ agentId: agent.id, turnId: eventTurnId });
         if (isForegroundEvent) {
           this.finalizeForegroundTurn(agent, eventTurnId);
         }

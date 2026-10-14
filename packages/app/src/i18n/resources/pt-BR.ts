@@ -1179,6 +1179,11 @@ export const ptBR: TranslationResources = {
       done: "Concluído",
     },
     display: {
+      sorting: {
+        label: "Ordenar por",
+        recent: "Atividade recente",
+        manual: "Ordem manual",
+      },
       showBackground: "Mostrar espaços em segundo plano",
       trigger: "Preferências de exibição",
       heading: "Exibição",

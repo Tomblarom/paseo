@@ -15,6 +15,10 @@ import {
   type SidebarGroupMode,
 } from "@/stores/sidebar-view-store";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
+import {
+  applyStoredOrdering,
+  sortSidebarProjectsByActivity,
+} from "@/hooks/sidebar-workspaces-view-model";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 import { buildSidebarProjection } from "./sidebar-projection";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
@@ -59,6 +63,9 @@ export function SidebarModelProvider({
   const list = useSidebarWorkspacesList({ enabled: active });
   const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarViewStore((state) => state.groupMode);
+  const sortMode = useSidebarViewStore((state) => state.sortMode);
+  const projectOrder = useSidebarOrderStore((state) => state.projectOrder);
+  const workspaceOrderByProject = useSidebarOrderStore((state) => state.workspaceOrderByProject);
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
   const projectFilters = useSidebarViewStore((state) => state.projectFilters);
   const reconcileLabelFilter = useSidebarViewStore((state) => state.reconcileLabelFilter);
@@ -138,7 +145,22 @@ export function SidebarModelProvider({
           : [];
       });
     }
-    return projects;
+    const orderedProjects = applyStoredOrdering({
+      items: projects,
+      storedOrder: projectOrder,
+      getKey: (project) => project.viewKey,
+    }).map((project) =>
+      Object.assign({}, project, {
+        workspaces: applyStoredOrdering({
+          items: project.workspaces,
+          storedOrder: workspaceOrderByProject[project.viewKey] ?? [],
+          getKey: (workspace) => workspace.workspaceKey,
+        }),
+      }),
+    );
+    return sortMode === "recent"
+      ? sortSidebarProjectsByActivity(orderedProjects, filteredWorkspaceEntriesByKey)
+      : orderedProjects;
   }, [
     showBackground,
     hasActiveLabelFilter,
@@ -146,6 +168,10 @@ export function SidebarModelProvider({
     resolvedProjectFilters,
     list.projects,
     visibleWorkspaceKeys,
+    sortMode,
+    projectOrder,
+    workspaceOrderByProject,
+    filteredWorkspaceEntriesByKey,
   ]);
   const pinnedKeys = usePinnedSidebarKeys(filteredProjects);
   const projectionInput = useMemo(
@@ -156,6 +182,7 @@ export function SidebarModelProvider({
       workspaceEntriesByKey: filteredWorkspaceEntriesByKey,
       projectNamesByViewKey: list.projectNamesByViewKey,
       groupMode,
+      sortMode,
       pinnedCollapsed,
       collapsedProjectKeys,
       collapsedWorkspaceGroupKeys,
@@ -165,6 +192,7 @@ export function SidebarModelProvider({
       collapsedProjectKeys,
       collapsedWorkspaceGroupKeys,
       groupMode,
+      sortMode,
       list.projectNamesByViewKey,
       filteredProjects,
       pinnedCollapsed,

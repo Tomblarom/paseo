@@ -1166,6 +1166,11 @@ export const ja: TranslationResources = {
       done: "完了",
     },
     display: {
+      sorting: {
+        label: "並び順",
+        recent: "最近のアクティビティ",
+        manual: "手動順",
+      },
       showBackground: "バックグラウンドを表示",
       trigger: "表示設定",
       heading: "表示",

@@ -2207,7 +2207,9 @@ function ProjectModeList({
     (reorderedProjects: SidebarProjectEntry[]) => {
       const reorderedProjectKeys = reorderedProjects.map((project) => project.viewKey);
       const currentProjectOrder = getProjectOrder();
+      const sortByRecentActivity = useSidebarViewStore.getState().sortMode === "recent";
       if (
+        !sortByRecentActivity &&
         !hasVisibleOrderChanged({
           currentOrder: currentProjectOrder,
           reorderedVisibleKeys: reorderedProjectKeys,
@@ -2222,6 +2224,7 @@ function ProjectModeList({
           reorderedVisibleKeys: reorderedProjectKeys,
         }),
       );
+      useSidebarViewStore.getState().setSortMode("manual");
     },
     [getProjectOrder, setProjectOrder],
   );
@@ -2230,7 +2233,9 @@ function ProjectModeList({
     (projectViewKey: string, reorderedWorkspaces: SidebarWorkspacePlacement[]) => {
       const reorderedWorkspaceKeys = reorderedWorkspaces.map((workspace) => workspace.workspaceKey);
       const currentWorkspaceOrder = getWorkspaceOrder(projectViewKey);
+      const sortByRecentActivity = useSidebarViewStore.getState().sortMode === "recent";
       if (
+        !sortByRecentActivity &&
         !hasVisibleOrderChanged({
           currentOrder: currentWorkspaceOrder,
           reorderedVisibleKeys: reorderedWorkspaceKeys,
@@ -2246,6 +2251,7 @@ function ProjectModeList({
           reorderedVisibleKeys: reorderedWorkspaceKeys,
         }),
       );
+      useSidebarViewStore.getState().setSortMode("manual");
     },
     [getWorkspaceOrder, setWorkspaceOrder],
   );

@@ -66,14 +66,16 @@ function renderBackdrop(props: BottomSheetBackdropProps) {
 }
 
 // Stacked sheets share the bottom sheet's dim rather than darkening it again, but still catch the
-// tap so it closes the top sheet.
+// tap so it closes the top sheet. The backdrop is clear rather than transparent: iOS skips views
+// under 0.01 opacity when hit testing, which would hand the tap to the sheet below.
 function renderStackedBackdrop(props: BottomSheetBackdropProps) {
   return (
     <BottomSheetBackdrop
       {...props}
+      style={styles.clearBackdrop}
       appearsOnIndex={0}
       disappearsOnIndex={-1}
-      opacity={0}
+      opacity={1}
       pressBehavior="close"
     />
   );
@@ -310,6 +312,9 @@ function WorkspaceSheetBody({
 const styles = StyleSheet.create({
   host: {
     ...StyleSheet.absoluteFillObject,
+  },
+  clearBackdrop: {
+    backgroundColor: "transparent",
   },
   sheetLayer: {
     ...StyleSheet.absoluteFillObject,

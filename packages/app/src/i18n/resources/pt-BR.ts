@@ -1307,6 +1307,7 @@ export const ptBR: TranslationResources = {
         pending: "Pendentes: {{count}}",
       },
       actions: {
+        changeRoot: "Alterar raiz do workspace",
         menu: "Ações do workspace",
         newWorkspace: "Novo workspace",
         showMore: "Mostrar mais",
@@ -1329,6 +1330,10 @@ export const ptBR: TranslationResources = {
           'Ocultar "{{workspaceName}}" da barra lateral?\n\nOs arquivos no disco não serão alterados.',
         hideConfirm: "Ocultar",
         cancel: "Cancelar",
+      },
+      root: {
+        title: "Alterar raiz do workspace",
+        submit: "Alterar raiz",
       },
       rename: {
         title: "Renomear workspace",

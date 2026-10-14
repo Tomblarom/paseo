@@ -6,6 +6,59 @@ import type {
   SidebarWorkspacePlacement,
 } from "@/hooks/use-sidebar-workspaces-list";
 import { buildSidebarProjection } from "./sidebar-projection";
+import { sortSidebarProjectsByActivity } from "@/hooks/sidebar-workspaces-view-model";
+
+describe("recent workspace ordering", () => {
+  it("moves recently active workspaces and their projects above older and unused ones", () => {
+    const older = makeWorkspace("older");
+    const recent = makeWorkspace("recent", "done", [], "other-project");
+    const unused = makeWorkspace("unused", "done", [], "empty-project");
+    const unusedSibling = makeWorkspace("unused-sibling", "done", [], "other-project");
+    older.entry.activityAt = new Date("2026-10-10T12:00:00Z");
+    recent.entry.activityAt = new Date("2026-10-14T12:00:00Z");
+    const projects = [
+      makeProject([unused.placement], "empty-project"),
+      makeProject([older.placement]),
+      makeProject([unusedSibling.placement, recent.placement], "other-project"),
+    ];
+    const entries = new Map(
+      [older, recent, unused, unusedSibling].map(({ entry }) => [entry.workspaceKey, entry]),
+    );
+    const sorted = sortSidebarProjectsByActivity(projects, entries);
+    expect(sorted.map((project) => project.viewKey)).toEqual([
+      "other-project",
+      "project",
+      "empty-project",
+    ]);
+    expect(sorted[0].workspaces.map((workspace) => workspace.workspaceId)).toEqual([
+      "recent",
+      "unused-sibling",
+    ]);
+    expect(projects[0].viewKey).toBe("empty-project");
+  });
+
+  it("keeps the existing order for equal or missing activity timestamps", () => {
+    const first = makeWorkspace("first");
+    const second = makeWorkspace("second");
+    first.entry.activityAt = new Date("2026-10-14T12:00:00Z");
+    second.entry.activityAt = new Date("2026-10-14T12:00:00Z");
+    const entries = new Map([first, second].map(({ entry }) => [entry.workspaceKey, entry]));
+    const sorted = sortSidebarProjectsByActivity(
+      [makeProject([second.placement, first.placement])],
+      entries,
+    );
+    expect(sorted[0].workspaces.map((workspace) => workspace.workspaceId)).toEqual([
+      "second",
+      "first",
+    ]);
+    expect(
+      sortSidebarProjectsByActivity(
+        [makeProject([first.placement, second.placement])],
+        new Map(),
+      )[0].workspaces,
+    ).toEqual([first.placement, second.placement]);
+  });
+});
 
 function makeWorkspace(
   id: string,

@@ -495,6 +495,7 @@ describe("normalizeWorkspaceDescriptor", () => {
       },
     ]);
     expect(workspace.scripts).not.toBe(scripts);
+    expect(workspace.activityAt).toBeNull();
   });
 
   it("canonicalizes the workspace directory and treats a blank one as empty", () => {

@@ -1161,6 +1161,11 @@ export const en = {
       done: "Done",
     },
     display: {
+      sorting: {
+        label: "Sort by",
+        recent: "Recent activity",
+        manual: "Manual order",
+      },
       showBackground: "Show background",
       trigger: "Display preferences",
       heading: "Display",

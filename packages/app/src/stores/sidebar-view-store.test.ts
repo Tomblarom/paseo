@@ -30,8 +30,18 @@ function createMemoryStorage(entries: Record<string, string | null>): MemoryStor
 }
 
 describe("sidebar view store", () => {
+  it("persists recent-activity sorting and allows manual order again", () => {
+    useSidebarViewStore.getState().setSortMode("recent");
+    expect(useSidebarViewStore.getState().sortMode).toBe("recent");
+    expect(migrateSidebarViewState({ sortMode: "recent", groupMode: "project" }).sortMode).toBe(
+      "recent",
+    );
+    useSidebarViewStore.getState().setSortMode("manual");
+    expect(useSidebarViewStore.getState().sortMode).toBe("manual");
+  });
   beforeEach(() => {
     useSidebarViewStore.setState({
+      sortMode: "recent",
       showBackground: false,
       groupMode: "project",
       hostFilters: [],
@@ -85,6 +95,7 @@ describe("sidebar view store", () => {
         },
       }),
     ).toEqual({
+      sortMode: "recent",
       showBackground: false,
       groupMode: "status",
       hostFilters: [],
@@ -100,6 +111,7 @@ describe("sidebar view store", () => {
         hostFilter: "host-a",
       }),
     ).toEqual({
+      sortMode: "recent",
       showBackground: false,
       groupMode: "status",
       hostFilters: ["host-a"],
@@ -115,6 +127,7 @@ describe("sidebar view store", () => {
         hostFilters: ["host-a", "host-b"],
       }),
     ).toEqual({
+      sortMode: "recent",
       showBackground: false,
       groupMode: "status",
       hostFilters: ["host-a", "host-b"],
@@ -226,6 +239,7 @@ describe("sidebar view store", () => {
         projectFilters: ["project-a", "project-b"],
       }),
     ).toEqual({
+      sortMode: "recent",
       showBackground: false,
       groupMode: "project",
       hostFilters: ["host-a"],
@@ -236,6 +250,7 @@ describe("sidebar view store", () => {
 
   it("never keeps project filters from state the schema rejects", () => {
     expect(migrateSidebarViewState({ projectFilters: "project-a" })).toEqual({
+      sortMode: "recent",
       showBackground: false,
       groupMode: "project",
       hostFilters: [],

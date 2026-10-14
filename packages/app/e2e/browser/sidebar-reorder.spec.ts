@@ -5,6 +5,36 @@ import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { getServerId } from "../support/helpers/server-id";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
+import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
+
+test("recent-activity sorting follows chat activity, preserves pins, and survives reload", async ({
+  page,
+}) => {
+  const older = await seedMockAgentWorkspace({ repoPrefix: "recent-first-", title: "Older chat" });
+  const newer = await seedMockAgentWorkspace({ repoPrefix: "recent-second-", title: "Newer chat" });
+  try {
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    const olderId = `sidebar-workspace-row-${getServerId()}:${older.workspaceId}`;
+    const newerId = `sidebar-workspace-row-${getServerId()}:${newer.workspaceId}`;
+    const rows = page.locator(`[data-testid="${olderId}"], [data-testid="${newerId}"]`);
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await page.getByTestId("sidebar-display-sorting").click();
+    await page.getByTestId("sidebar-sorting-recent").click();
+    await expect.poll(() => rowTestIds(rows)).toEqual([newerId, olderId]);
+
+    await older.client.sendAgentMessage(older.agentId, "Reply with hello.");
+    await expect.poll(() => rowTestIds(rows)).toEqual([olderId, newerId]);
+    await page.reload();
+    await expect.poll(() => rowTestIds(rows)).toEqual([olderId, newerId]);
+
+    await newer.client.setWorkspacePinned(newer.workspaceId, true);
+    await expect.poll(() => rowTestIds(rows)).toEqual([newerId, olderId]);
+  } finally {
+    await older.cleanup();
+    await newer.cleanup();
+  }
+});
 
 async function rowTestIds(rows: Locator) {
   return rows.evaluateAll((elements) =>

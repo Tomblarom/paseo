@@ -174,7 +174,10 @@ export function createSidebarWorkspaceEntry(input: {
     currentBranch: normalizeCurrentBranch(input.workspace.gitRuntime?.currentBranch),
     statusBucket: effectiveStatus.status,
     statusEnteredAt: effectiveStatus.enteredAt,
-    activityAt: input.workspace.activityAt,
+    activityAt: latestWorkspaceActivity(
+      input.workspace.activityAt,
+      input.workspaceAgentActivity?.get(input.workspace.id)?.activityAt,
+    ),
     archivingAt: input.workspace.archivingAt,
     diffStat: input.workspace.diffStat,
     prHint: selectPrHintFromStatus(
@@ -189,6 +192,15 @@ export function createSidebarWorkspaceEntry(input: {
 }
 
 const EMPTY_WORKSPACE_LABELS: string[] = [];
+
+function latestWorkspaceActivity(
+  descriptor: Date | null | undefined,
+  chat: Date | undefined,
+): Date | null {
+  if (!descriptor) return chat ?? null;
+  if (!chat) return descriptor;
+  return chat > descriptor ? chat : descriptor;
+}
 
 function deriveEffectiveWorkspaceStatus(input: {
   serverId: string;

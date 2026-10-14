@@ -6,6 +6,7 @@ export interface WorkspaceAgentActivity {
   agentId: string;
   status: WorkspaceDescriptor["status"];
   enteredAt: Date | null;
+  activityAt?: Date;
 }
 
 function workspaceAgentStatus(agent: Agent): Agent["status"] {
@@ -19,11 +20,17 @@ export function buildWorkspaceAgentActivityIndex(
 ): Map<string, WorkspaceAgentActivity> {
   const activityByWorkspaceId = new Map<string, WorkspaceAgentActivity>();
   const latestActivityAtByWorkspaceId = new Map<string, Date>();
+  const latestChatActivityByWorkspaceId = new Map<string, Date>();
 
   for (const agent of agents.values()) {
     const parentAgent = agent.parentAgentId ? agents.get(agent.parentAgentId) : undefined;
     if (agent.archivedAt || !agent.workspaceId || !isWorkspaceRootAgent(agent, parentAgent)) {
       continue;
+    }
+
+    const chatActivityAt = latestChatActivityByWorkspaceId.get(agent.workspaceId);
+    if (!chatActivityAt || agent.lastActivityAt > chatActivityAt) {
+      latestChatActivityByWorkspaceId.set(agent.workspaceId, agent.lastActivityAt);
     }
 
     const enteredAt = agent.attentionTimestamp ?? agent.updatedAt;
@@ -47,19 +54,27 @@ export function buildWorkspaceAgentActivityIndex(
   }
 
   for (const [workspaceId, activity] of activityByWorkspaceId) {
-    const previousActivity = previous?.get(workspaceId);
-    if (
-      previousActivity?.agentId === activity.agentId &&
-      previousActivity.status === activity.status
-    ) {
-      activityByWorkspaceId.set(workspaceId, previousActivity);
-    }
+    activity.activityAt = latestChatActivityByWorkspaceId.get(workspaceId);
+    activityByWorkspaceId.set(
+      workspaceId,
+      preserveWorkspaceStatusEntry(activity, previous?.get(workspaceId)),
+    );
   }
 
   if (previous && areWorkspaceAgentActivityIndexesIdentical(previous, activityByWorkspaceId)) {
     return previous instanceof Map ? previous : new Map(previous);
   }
   return activityByWorkspaceId;
+}
+
+function preserveWorkspaceStatusEntry(
+  activity: WorkspaceAgentActivity,
+  previous: WorkspaceAgentActivity | undefined,
+): WorkspaceAgentActivity {
+  if (previous?.agentId !== activity.agentId || previous.status !== activity.status)
+    return activity;
+  if (previous.activityAt?.getTime() === activity.activityAt?.getTime()) return previous;
+  return { ...activity, enteredAt: previous.enteredAt };
 }
 
 function areWorkspaceAgentActivityIndexesIdentical(

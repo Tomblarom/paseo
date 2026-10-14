@@ -13,6 +13,12 @@ test("recent-activity sorting follows chat activity, preserves pins, and survive
   const older = await seedMockAgentWorkspace({ repoPrefix: "recent-first-", title: "Older chat" });
   const newer = await seedMockAgentWorkspace({ repoPrefix: "recent-second-", title: "Newer chat" });
   try {
+    await newer.client.sendAgentMessage(newer.agentId, "Reply with hello.");
+    await newer.client.waitForAgentUpsert(
+      newer.agentId,
+      (snapshot) => snapshot.status === "idle",
+      15_000,
+    );
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     const olderId = `sidebar-workspace-row-${getServerId()}:${older.workspaceId}`;

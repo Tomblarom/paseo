@@ -1290,12 +1290,17 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     }, [isActiveComposer]);
     // The compact and desktop screens mount the editor in different trees, so a
     // viewport that crosses the breakpoint remounts it. The draft owner brings the
-    // text back; the session brings the caret and focus intent back.
+    // text back; the session brings the caret and focus intent back. On web the
+    // owner may still hold an unpublished edit while the new editor mounts, so the
+    // caret is placed now against the text on screen and again when the owner's
+    // hydrated text arrives.
+    const retainedSelectionRef = useRef<{ start: number; end: number } | null>(null);
     useLayoutEffect(() => {
       const retained = editingSession.takeEditor();
       if (retained) {
         const text = textInputRef.current?.getText() ?? valueRef.current;
         const selection = resolveRetainedSelection(retained.selection, text.length);
+        retainedSelectionRef.current = retained.selection;
         selectionRef.current = selection;
         textInputRef.current?.setSelection(selection);
         if (retained.focused) {
@@ -1401,8 +1406,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       updateComposerHeightForText?.(valueRef.current, textReplacement.text);
       valueRef.current = textReplacement.text;
       updateLiveTextPresence(textReplacement.text);
+      const retainedSelection =
+        textReplacement.kind === "hydrated" ? retainedSelectionRef.current : null;
+      retainedSelectionRef.current = null;
       if (textReplacement.text === "") {
         textInputRef.current?.reset();
+      } else if (retainedSelection) {
+        const selection = resolveRetainedSelection(retainedSelection, textReplacement.text.length);
+        selectionRef.current = selection;
+        textInputRef.current?.replaceText(textReplacement.text, selection);
       } else {
         textInputRef.current?.replaceText(textReplacement.text);
       }

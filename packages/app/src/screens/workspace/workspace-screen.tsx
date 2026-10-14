@@ -28,7 +28,6 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
 import invariant from "tiny-invariant";
 import { SidebarMenuToggle } from "@/components/headers/sidebar-menu-toggle";
-import { useIsMobilePanelActive } from "@/mobile-panels/provider";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { FloatingHeaderLayout } from "@/components/floating-header";
@@ -369,18 +368,6 @@ const MobileMountedTabSlot = memo(function MobileMountedTabSlot({
     </RenderProfile>
   );
 });
-
-/**
- * A workspace's panes give up input (shortcuts, the fullscreen exit action) while focus is
- * parked, the sheet covers them, or a compact overlay panel (agent list, explorer) does.
- */
-function usePaneFocusSuspended(workspaceKey: string | null, isCompact: boolean): boolean {
-  const suspendedByLayout = useWorkspaceLayoutStore((state) =>
-    workspaceKey ? selectPaneFocusSuspended(state, workspaceKey) : false,
-  );
-  const overlayPanelOpen = !useIsMobilePanelActive("agent");
-  return suspendedByLayout || (isCompact && overlayPanelOpen);
-}
 
 function useStableTabDescriptorMap(tabDescriptors: WorkspaceTabDescriptor[]) {
   const cacheRef = useRef(new Map<string, WorkspaceTabDescriptor>());
@@ -1294,7 +1281,9 @@ function WorkspaceScreenContent({
   const explorerSidebarPaneId = useWorkspaceLayoutStore((state) =>
     persistenceKey ? selectExplorerSidebarPaneId(state, persistenceKey) : null,
   );
-  const paneFocusSuspended = usePaneFocusSuspended(persistenceKey, isMobile);
+  const paneFocusSuspended = useWorkspaceLayoutStore((state) =>
+    persistenceKey ? selectPaneFocusSuspended(state, persistenceKey) : false,
+  );
   const lastMainPaneRef = useLastMainPane({
     workspaceKey: persistenceKey,
     layout: workspaceLayout,
@@ -3119,7 +3108,6 @@ function WorkspaceScreenContent({
     focusedPaneTabDescriptorMap,
     isRouteFocused,
     focusedPaneId,
-    // The sheet or a compact overlay panel owns input while it covers the tab.
     paneFocusSuspended,
     onFocusPane: handleFocusPane,
     buildMobilePaneContentModel,

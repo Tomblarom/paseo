@@ -31,6 +31,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { usePanelStore } from "@/stores/panel-store";
 import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useShallow } from "zustand/shallow";
 import {
@@ -1192,8 +1193,14 @@ function ComposerVoiceModeButton({
 }
 
 export function Composer({ isPaneFocused, ...props }: ComposerProps) {
+  // A compact overlay panel (agent list, explorer) covers the pane without taking its
+  // focus. The composer gives up input from the moment the user asks for the panel,
+  // not when its motion settles, so the exit action and autocomplete never race it.
+  const isCompact = useIsCompactFormFactor();
+  const overlayPanelRequested = usePanelStore((state) => state.mobilePanel.target !== "agent");
+  const coveredByOverlayPanel = isCompact && overlayPanelRequested;
   return (
-    <ComposerKeyboardScopeProvider isActiveComposer={isPaneFocused}>
+    <ComposerKeyboardScopeProvider isActiveComposer={isPaneFocused && !coveredByOverlayPanel}>
       <RenderProfile id="ComposerContent">
         <ComposerContent {...props} />
       </RenderProfile>

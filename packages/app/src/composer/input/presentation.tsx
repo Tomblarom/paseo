@@ -22,7 +22,8 @@ function keepEditorFocused(event: import("react-native").PointerEvent) {
  * One tree for both layout modes. The editing surface keeps its position so the
  * mounted editor, its native buffer, selection, and focus survive every toggle;
  * only the chrome around it changes. Fullscreen shows exit top right and Send
- * bottom right, both on the rail the inline Send button uses.
+ * bottom right, both on the rail the inline Send button uses; a send error sits
+ * in the same footer as Send.
  */
 export function ComposerInputPresentation({
   fullscreen,
@@ -125,9 +126,11 @@ export function ComposerInputPresentation({
           {fullscreen ? null : toolbar}
         </View>
       </ComposerFullscreenBody>
-      {fullscreen ? error : null}
       {fullscreen ? (
-        <ComposerFullscreenFooter style={styles.sendRow}>{send}</ComposerFullscreenFooter>
+        <ComposerFullscreenFooter style={styles.footer}>
+          {error}
+          <View style={styles.sendRow}>{send}</View>
+        </ComposerFullscreenFooter>
       ) : null}
       {overlay}
     </View>
@@ -162,5 +165,7 @@ const styles = StyleSheet.create((theme) => ({
   fullscreenInputWrapper: { flex: 1, minHeight: 0 },
   fullscreenTextSurface: { flex: 1, minHeight: 0 },
   exitRow: { alignItems: "flex-end", flexShrink: 0 },
-  sendRow: { flexShrink: 0, alignItems: "flex-end" },
+  // The send error rides the keyboard with Send; below the body it would sit behind it.
+  footer: { flexShrink: 0, gap: theme.spacing[3] },
+  sendRow: { alignItems: "flex-end" },
 }));

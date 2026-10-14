@@ -176,6 +176,25 @@ async function swipeOpenMobileAgentSidebar(page: Page): Promise<void> {
   await page.mouse.up();
 }
 
+/** Freeze the page's timers and animation frames until `page.clock.resume()`. */
+async function pausePageClock(page: Page): Promise<void> {
+  const now = Date.now();
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now);
+}
+
+/** The send error shares the footer with Send, so whatever keeps Send visible keeps it visible. */
+async function expectFullscreenErrorAboveSend(page: Page): Promise<void> {
+  const frame = page.getByTestId("composer-fullscreen");
+  const alertBox = (await frame.getByRole("alert").boundingBox())!;
+  const sendBox = (await page
+    .getByRole("button", { name: "Send message", exact: true })
+    .boundingBox())!;
+  const editorBox = (await composerLocator(page).boundingBox())!;
+  expect(alertBox.y).toBeGreaterThanOrEqual(editorBox.y + editorBox.height);
+  expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(sendBox.y);
+}
+
 async function writeCompactDraft(page: Page, text: string): Promise<void> {
   await composerLocator(page).fill(text);
   await expect(composerLocator(page)).toHaveValue(text);
@@ -286,6 +305,34 @@ test("compact fullscreen editing preserves the live draft and selection and stay
   }
 });
 
+test("a caret inside an unpublished edit survives a breakpoint remount", async ({ page }) => {
+  const agent = await seedMockAgentWorkspace({
+    repoPrefix: "composer-remount-caret-",
+    title: "Remount caret",
+  });
+  try {
+    await resizeComposerViewport(page, "portrait");
+    await openAgentRoute(page, agent);
+    await expectComposerVisible(page);
+    await writeCompactDraft(page, "Short draft");
+    await selectComposerDraftRange(page, 5, 5);
+    // The draft owner publishes web edits after the next paint. A rotation inside that
+    // window remounts the editor before the edit has reached the draft store; the paused
+    // clock holds the page there instead of racing the frame.
+    await pausePageClock(page);
+    await composerLocator(page).press("X");
+    await resizeComposerViewport(page, "landscape");
+    await page.clock.resume();
+    await expect(composerLocator(page)).toHaveValue("ShortX draft");
+    await expectComposerDraftSelection(page, 6, 6);
+    await expect(composerLocator(page)).toBeFocused();
+    await composerLocator(page).press("Y");
+    await expect(composerLocator(page)).toHaveValue("ShortXY draft");
+  } finally {
+    await agent.cleanup();
+  }
+});
+
 test("fullscreen submit rejection retains the editable draft and supports retry", async ({
   page,
 }) => {
@@ -305,6 +352,7 @@ test("fullscreen submit rejection retains the editable draft and supports retry"
     await expect(page.getByTestId("composer-fullscreen").getByRole("alert")).toHaveText(
       "Requested mock prompt rejection",
     );
+    await expectFullscreenErrorAboveSend(page);
     await expect(composerLocator(page)).toHaveValue(draft);
     await expect(composerLocator(page)).toBeEditable();
     await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeEnabled();

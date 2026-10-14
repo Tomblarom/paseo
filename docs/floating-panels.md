@@ -212,8 +212,12 @@ New workspace keys its sessions by draft in the app-level store for the same
 reason. The centered form honors fullscreen by style alone: no centering, no
 translation, setup fields hidden, slot filling the stationary viewport. The
 global exit action (Escape, hardware back) is registered only for the active
-pane: a retained tab keeps its fullscreen editor mounted while hidden, and the
-sheet, agent list, or explorer covering the tab suspends pane focus.
+composer: a retained tab keeps its fullscreen editor mounted while hidden, the
+sheet suspends pane focus, and the composer gives up input from the moment the
+user asks for the compact agent list or explorer, before the panel's motion
+settles. Pane focus itself stays put under those panels: the agent panel reads
+it as "the user is in this chat" for attention clearing, and opening the agent
+list must not clear the attention it shows.
 The band beside the inline editor where the fullscreen glyph sits is the input's
 own right padding, so a tap anywhere in it focuses the editor whether or not the
 glyph shows. On web the slot is a fixed box over the visible viewport, which is

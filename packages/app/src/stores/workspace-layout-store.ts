@@ -864,7 +864,7 @@ function sheetHoldsUnsavedWork(workspaceKey: string, sheet: WorkspaceSheet): boo
 /**
  * Where an open lands in the sheet stack, or null when it opens as a tab. A new target goes on
  * top. A reveal of a resource a sheet already shows keeps that sheet's tab and brings it back to
- * the top, closing the sheets above it, unless one of those holds unsaved work.
+ * the top; the sheets above it close, except ones holding unsaved work, which stay beneath it.
  */
 function resolveSheetPlacement(
   state: WorkspaceLayoutStore,
@@ -878,11 +878,7 @@ function resolveSheetPlacement(
   const sheets = getSheets(state, workspaceKey);
   const resourceKey = panelResourceKey(target);
   const index = sheets.findIndex((sheet) => panelResourceKey(sheet.tab.target) === resourceKey);
-  if (index === -1) return { policy, keptIndex: null };
-  const above = sheets.slice(index + 1);
-  return above.some((sheet) => sheetHoldsUnsavedWork(workspaceKey, sheet))
-    ? null
-    : { policy, keptIndex: index };
+  return { policy, keptIndex: index === -1 ? null : index };
 }
 
 /** Closes the sheets because navigation moved on underneath them, except ones with unsaved work. */
@@ -1005,7 +1001,15 @@ export function createWorkspaceLayoutStore(
               parentTabId,
               state: input.state,
             });
-            const below = keptIndex === null ? sheets : sheets.slice(0, keptIndex);
+            const below =
+              keptIndex === null
+                ? sheets
+                : [
+                    ...sheets.slice(0, keptIndex),
+                    ...sheets
+                      .slice(keptIndex + 1)
+                      .filter((above) => sheetHoldsUnsavedWork(normalizedWorkspaceKey, above)),
+                  ];
             set((state) => withSheets(state, normalizedWorkspaceKey, [...below, sheet]));
             return sheet.tab.tabId;
           }

@@ -31,7 +31,8 @@ switcher keeps only agents and terminals. A panel kind opts in with `compactShee
 sheet and tab, so callers open targets the same way on every layout. Each sheet holds one ordinary
 `WorkspaceTab`, and sheets stack: a target opened from a sheet covers it, and closing the top sheet
 (drag, Close, backdrop, or Android Back) uncovers the one below. Revealing a target that already has
-a sheet drops the sheets above it. Opening a sheet as a tab dismisses the sheets above it, since the
+a sheet brings that sheet back to the top and closes the sheets above it, except ones holding unsaved
+work. Opening a sheet as a tab dismisses the sheets above it, since the
 tab would sit under them. The stack is not persisted.
 
 Sheets are modal and cover the whole compact column, header included. A sheet's header is its drag

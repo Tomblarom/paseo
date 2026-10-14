@@ -4878,19 +4878,26 @@ describe("compact workspace sheet", () => {
       });
     });
 
-    it("opens a stacked target as a tab rather than dropping a modified sheet above it", () => {
+    it("brings a covered sheet back to the top and keeps a modified sheet above it beneath", () => {
       const store = createCompactStore();
       const otherTarget = { kind: "file" as const, path: "src/other.ts" };
-      store.getState().openTab({ workspaceKey, target: otherTarget, intent: "reveal" });
+      const otherTabId = store
+        .getState()
+        .openTab({ workspaceKey, target: otherTarget, intent: "reveal" });
       const modifiedSheetTabId = openModifiedFileSheet(store);
+      const focusedBefore = focusedTabId(store);
 
       const tabId = store
         .getState()
         .openTab({ workspaceKey, target: otherTarget, intent: "reveal" });
 
-      expect(sheetTabId(store)).toBe(modifiedSheetTabId);
-      expect(stripTab(store, tabId ?? "")).toMatchObject({ target: otherTarget });
-      expect(focusedTabId(store)).toBe(tabId);
+      expect(tabId).toBe(otherTabId);
+      expect(sheetTargets(store)).toEqual([fileTarget, otherTarget]);
+      expect(store.getState().sheetsByWorkspace[workspaceKey]?.[0]?.tab.tabId).toBe(
+        modifiedSheetTabId,
+      );
+      expect(stripTab(store, tabId ?? "")).toBeNull();
+      expect(focusedTabId(store)).toBe(focusedBefore);
     });
 
     it("opens a tab target under a modified sheet without closing it", () => {

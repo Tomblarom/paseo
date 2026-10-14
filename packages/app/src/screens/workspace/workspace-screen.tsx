@@ -1,4 +1,7 @@
-import { WorkspaceComposerEditingSessionsProvider } from "@/composer/editing-session";
+import {
+  WorkspaceComposerEditingSessionsProvider,
+  useComposerTabFullscreen,
+} from "@/composer/editing-session";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { JsonValue } from "@getpaseo/protocol/agent-types";
 import { getOpenAgentTabLabel } from "@getpaseo/protocol/agent-labels";
@@ -25,6 +28,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
 import invariant from "tiny-invariant";
 import { SidebarMenuToggle } from "@/components/headers/sidebar-menu-toggle";
+import { useIsMobilePanelActive } from "@/mobile-panels/provider";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { FloatingHeaderLayout } from "@/components/floating-header";
@@ -365,6 +369,18 @@ const MobileMountedTabSlot = memo(function MobileMountedTabSlot({
     </RenderProfile>
   );
 });
+
+/**
+ * A workspace's panes give up input (shortcuts, the fullscreen exit action) while focus is
+ * parked, the sheet covers them, or a compact overlay panel (agent list, explorer) does.
+ */
+function usePaneFocusSuspended(workspaceKey: string | null, isCompact: boolean): boolean {
+  const suspendedByLayout = useWorkspaceLayoutStore((state) =>
+    workspaceKey ? selectPaneFocusSuspended(state, workspaceKey) : false,
+  );
+  const overlayPanelOpen = !useIsMobilePanelActive("agent");
+  return suspendedByLayout || (isCompact && overlayPanelOpen);
+}
 
 function useStableTabDescriptorMap(tabDescriptors: WorkspaceTabDescriptor[]) {
   const cacheRef = useRef(new Map<string, WorkspaceTabDescriptor>());
@@ -824,6 +840,16 @@ function floatsHeaderOverContent(activeTab: WorkspaceTabDescriptor | null): bool
   return supportsStreamTopOverlay && activeTab?.kind === "agent";
 }
 
+/** A fullscreen composer covers the compact header; the column lays out without it. */
+function resolveCompactHeaderLayout(input: {
+  header: ReactNode;
+  activeTab: WorkspaceTabDescriptor | null;
+  composerFullscreen: boolean;
+}): { header: ReactNode; floating: boolean } {
+  if (input.composerFullscreen) return { header: null, floating: false };
+  return { header: input.header, floating: floatsHeaderOverContent(input.activeTab) };
+}
+
 function shouldShowWorkspaceScreenHeader(input: {
   isFocusModeEnabled: boolean;
   isMobile: boolean;
@@ -1268,9 +1294,7 @@ function WorkspaceScreenContent({
   const explorerSidebarPaneId = useWorkspaceLayoutStore((state) =>
     persistenceKey ? selectExplorerSidebarPaneId(state, persistenceKey) : null,
   );
-  const paneFocusSuspended = useWorkspaceLayoutStore((state) =>
-    persistenceKey ? selectPaneFocusSuspended(state, persistenceKey) : false,
-  );
+  const paneFocusSuspended = usePaneFocusSuspended(persistenceKey, isMobile);
   const lastMainPaneRef = useLastMainPane({
     workspaceKey: persistenceKey,
     layout: workspaceLayout,
@@ -3095,7 +3119,7 @@ function WorkspaceScreenContent({
     focusedPaneTabDescriptorMap,
     isRouteFocused,
     focusedPaneId,
-    // The sheet owns input while it covers the tab.
+    // The sheet or a compact overlay panel owns input while it covers the tab.
     paneFocusSuspended,
     onFocusPane: handleFocusPane,
     buildMobilePaneContentModel,
@@ -3528,6 +3552,11 @@ function WorkspaceScreenContent({
     [uiTabs, sheetTab],
   );
   const workspacePanelKey = `${normalizedServerId}:${normalizedWorkspaceId}`;
+  const compactHeaderLayout = resolveCompactHeaderLayout({
+    header: compactWorkspaceHeader,
+    activeTab: activeTabDescriptor,
+    composerFullscreen: useComposerTabFullscreen(workspacePanelKey, activeTabId),
+  });
 
   // The sheet is the column's last child, so it covers the compact header as a modal.
   const workspaceCenterColumn = isMobile ? (
@@ -3538,8 +3567,8 @@ function WorkspaceScreenContent({
     >
       <View style={styles.centerColumn}>
         <FloatingHeaderLayout
-          header={compactWorkspaceHeader}
-          floating={floatsHeaderOverContent(activeTabDescriptor)}
+          header={compactHeaderLayout.header}
+          floating={compactHeaderLayout.floating}
         >
           {(topOverlayInset) => (
             <StreamTopOverlayProvider value={topOverlayInset}>

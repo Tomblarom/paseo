@@ -37,6 +37,7 @@ export interface SidebarStatusWorkspacePlacement extends SidebarWorkspacePlaceme
 }
 
 export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
+  activityAt?: Date | null;
   workspaceDirectory: string;
   workspaceDirectoryLabel: string;
   // Raw user-set title (null when the name is derived from branch/directory).
@@ -173,6 +174,7 @@ export function createSidebarWorkspaceEntry(input: {
     currentBranch: normalizeCurrentBranch(input.workspace.gitRuntime?.currentBranch),
     statusBucket: effectiveStatus.status,
     statusEnteredAt: effectiveStatus.enteredAt,
+    activityAt: input.workspace.activityAt,
     archivingAt: input.workspace.archivingAt,
     diffStat: input.workspace.diffStat,
     prHint: selectPrHintFromStatus(
@@ -480,6 +482,32 @@ export function shouldShowSidebarHostLabels(projects: SidebarProjectEntry[]): bo
     }
   }
   return serverIds.size >= 2;
+}
+
+export function sortSidebarProjectsByActivity(
+  projects: readonly SidebarProjectEntry[],
+  entries: ReadonlyMap<string, SidebarWorkspaceEntry>,
+): SidebarProjectEntry[] {
+  const activityByKey = new Map<string, number>();
+  for (const [key, entry] of entries) activityByKey.set(key, entry.activityAt?.getTime() ?? 0);
+  const projectActivity = new Map<string, number>();
+  const sorted = projects.map((project) => {
+    const workspaces = [...project.workspaces];
+    workspaces.sort(
+      (left, right) =>
+        (activityByKey.get(right.workspaceKey) ?? 0) - (activityByKey.get(left.workspaceKey) ?? 0),
+    );
+    let latest = 0;
+    for (const workspace of workspaces)
+      latest = Math.max(latest, activityByKey.get(workspace.workspaceKey) ?? 0);
+    projectActivity.set(project.viewKey, latest);
+    return { ...project, workspaces };
+  });
+  sorted.sort(
+    (left, right) =>
+      (projectActivity.get(right.viewKey) ?? 0) - (projectActivity.get(left.viewKey) ?? 0),
+  );
+  return sorted;
 }
 
 export function applyStoredOrdering<T>(input: {

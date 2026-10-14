@@ -1170,6 +1170,11 @@ export const ru: TranslationResources = {
       done: "Готово",
     },
     display: {
+      sorting: {
+        label: "Сортировка",
+        recent: "Недавняя активность",
+        manual: "Вручную",
+      },
       showBackground: "Показать фоновые пространства",
       trigger: "Настройки отображения",
       heading: "Отображение",

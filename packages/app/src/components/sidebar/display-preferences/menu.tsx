@@ -49,6 +49,7 @@ import {
   hasActiveSidebarLabelFilter,
   SIDEBAR_UNLABELLED_LABEL_KEY,
   type SidebarGroupMode,
+  type SidebarSortMode,
 } from "@/stores/sidebar-view-store";
 import { workspaceLabelKey, type WorkspaceLabelColor } from "@getpaseo/protocol/workspace-labels";
 import type { WorkspaceTitleSource } from "@/hooks/use-settings";
@@ -121,6 +122,15 @@ const TRAILING_ICONS: Record<SidebarTrailingChoice, OptionIcon> = {
 };
 
 const GROUPING_MODES: readonly SidebarGroupMode[] = ["project", "status"];
+const SORT_MODES: readonly SidebarSortMode[] = ["recent", "manual"];
+const SORT_ICONS: Record<SidebarSortMode, OptionIcon> = {
+  recent: withUnistyles(Clock),
+  manual: withUnistyles(Folder),
+};
+const SORT_LABEL_KEYS: Record<SidebarSortMode, string> = {
+  recent: "sidebar.display.sorting.recent",
+  manual: "sidebar.display.sorting.manual",
+};
 const TITLE_SOURCES: readonly WorkspaceTitleSource[] = ["title", "branch"];
 const TRAILING_CHOICES: readonly SidebarTrailingChoice[] = ["diff", "timestamp"];
 
@@ -191,6 +201,20 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
 
   const pages = useMemo<MenuPageDefinition[]>(() => {
     const definitions: MenuPageDefinition[] = [
+      {
+        id: "sorting",
+        title: t("sidebar.display.sorting.label"),
+        content: (
+          <OptionList
+            values={SORT_MODES}
+            icons={SORT_ICONS}
+            labelKeys={SORT_LABEL_KEYS}
+            selectedValue={preferences.sortMode}
+            onSelect={preferences.setSortMode}
+            testIDPrefix="sidebar-sorting"
+          />
+        ),
+      },
       {
         id: "grouping",
         title: t("sidebar.display.grouping.label"),
@@ -314,6 +338,13 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
             testID="sidebar-display-grouping"
           >
             {t("sidebar.display.grouping.label")}
+          </MenuSubTrigger>
+          <MenuSubTrigger
+            id="sorting"
+            value={t(SORT_LABEL_KEYS[preferences.sortMode])}
+            testID="sidebar-display-sorting"
+          >
+            {t("sidebar.display.sorting.label")}
           </MenuSubTrigger>
           <MenuSubTrigger
             id="titleSource"

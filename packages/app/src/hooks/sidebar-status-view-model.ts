@@ -28,6 +28,7 @@ export function buildStatusGroups(
   workspaces: SidebarWorkspaceEntry[],
   projectNamesByViewKey: Map<string, string>,
   t: TFunction,
+  sortByRecentActivity = false,
 ): StatusGroup[] {
   const bucketRows = new Map<StatusBucket, SidebarWorkspaceEntry[]>();
 
@@ -47,7 +48,7 @@ export function buildStatusGroups(
     const rows = bucketRows.get(bucket);
     if (!rows || rows.length === 0) continue;
 
-    rows.sort((a, b) => compareStatusRows(a, b, projectNamesByViewKey));
+    rows.sort((a, b) => compareStatusRows(a, b, projectNamesByViewKey, sortByRecentActivity));
     groups.push({ bucket, label: getStatusBucketLabel(bucket, t), rows });
   }
 
@@ -58,9 +59,12 @@ function compareStatusRows(
   a: SidebarWorkspaceEntry,
   b: SidebarWorkspaceEntry,
   projectNamesByViewKey: Map<string, string>,
+  sortByRecentActivity: boolean,
 ): number {
-  const aTime = a.statusEnteredAt?.getTime() ?? null;
-  const bTime = b.statusEnteredAt?.getTime() ?? null;
+  const aTimestamp = sortByRecentActivity ? a.activityAt : a.statusEnteredAt;
+  const bTimestamp = sortByRecentActivity ? b.activityAt : b.statusEnteredAt;
+  const aTime = aTimestamp?.getTime() ?? null;
+  const bTime = bTimestamp?.getTime() ?? null;
 
   if (aTime !== null && bTime !== null) {
     if (aTime !== bTime) return bTime - aTime;

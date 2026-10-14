@@ -1180,6 +1180,11 @@ export const fr: TranslationResources = {
       done: "Terminé",
     },
     display: {
+      sorting: {
+        label: "Trier par",
+        recent: "Activité récente",
+        manual: "Ordre manuel",
+      },
       showBackground: "Afficher les espaces en arrière-plan",
       trigger: "Préférences d’affichage",
       heading: "Affichage",

@@ -27,6 +27,7 @@ function ws(
     currentBranch: input.currentBranch ?? null,
     statusBucket: input.statusBucket ?? "done",
     statusEnteredAt: input.statusEnteredAt ?? null,
+    activityAt: input.activityAt ?? null,
     archivingAt: null,
     diffStat: null,
     prHint: null,
@@ -45,6 +46,30 @@ function d(iso: string): Date {
 const emptyProjectNames = new Map<string, string>();
 
 describe("buildStatusGroups", () => {
+  it("sorts by latest chat activity when selected, even if status has not changed", () => {
+    const workspaces = [
+      ws({
+        workspaceKey: "srv:first",
+        statusEnteredAt: d("2026-10-14T12:00:00Z"),
+        activityAt: d("2026-10-14T10:00:00Z"),
+      }),
+      ws({
+        workspaceKey: "srv:second",
+        statusEnteredAt: d("2026-10-14T10:00:00Z"),
+        activityAt: d("2026-10-14T13:00:00Z"),
+      }),
+    ];
+    expect(
+      buildStatusGroups(workspaces, emptyProjectNames, i18n.t, true)[0].rows.map(
+        (row) => row.workspaceKey,
+      ),
+    ).toEqual(["srv:second", "srv:first"]);
+    expect(
+      buildStatusGroups(workspaces, emptyProjectNames, i18n.t)[0].rows.map(
+        (row) => row.workspaceKey,
+      ),
+    ).toEqual(["srv:first", "srv:second"]);
+  });
   it("groups workspaces by status bucket in fixed order", () => {
     const workspaces = [
       ws({ workspaceKey: "srv:done-ws", statusBucket: "done", name: "done-ws" }),

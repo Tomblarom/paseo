@@ -1189,6 +1189,11 @@ export const es: TranslationResources = {
       done: "Terminado",
     },
     display: {
+      sorting: {
+        label: "Ordenar por",
+        recent: "Actividad reciente",
+        manual: "Orden manual",
+      },
       showBackground: "Mostrar espacios en segundo plano",
       trigger: "Preferencias de visualización",
       heading: "Visualización",

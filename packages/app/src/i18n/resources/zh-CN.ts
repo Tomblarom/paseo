@@ -1145,6 +1145,11 @@ export const zhCN: TranslationResources = {
       done: "已完成",
     },
     display: {
+      sorting: {
+        label: "排序方式",
+        recent: "最近活动",
+        manual: "手动排序",
+      },
       showBackground: "显示后台工作区",
       trigger: "显示偏好",
       heading: "显示",

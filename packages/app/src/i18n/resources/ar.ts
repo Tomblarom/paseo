@@ -1153,6 +1153,11 @@ export const ar: TranslationResources = {
       done: "تم",
     },
     display: {
+      sorting: {
+        label: "ترتيب حسب",
+        recent: "النشاط الأخير",
+        manual: "ترتيب يدوي",
+      },
       showBackground: "إظهار مساحات العمل في الخلفية",
       trigger: "تفضيلات العرض",
       heading: "العرض",

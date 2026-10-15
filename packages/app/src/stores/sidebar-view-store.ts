@@ -131,7 +131,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   const result = SidebarViewPersistedStateSchema.safeParse(persistedState);
   if (!result.success) {
     return {
-      sortMode: "recent",
+      sortMode: "manual",
       showBackground: false,
       groupMode: "project",
       hostFilters: [],
@@ -144,7 +144,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   const legacyGroupMode = readLegacyGroupMode(state);
   if (legacyGroupMode) {
     return {
-      sortMode: "recent",
+      sortMode: "manual",
       showBackground: false,
       groupMode: legacyGroupMode,
       hostFilters: [],
@@ -154,7 +154,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   }
 
   return {
-    sortMode: state.sortMode ?? "recent",
+    sortMode: state.sortMode ?? "manual",
     showBackground: state.showBackground ?? false,
     groupMode: state.groupMode === "status" ? "status" : "project",
     hostFilters: readHostFilters(state),
@@ -193,7 +193,7 @@ export function createSidebarViewStorage(
 export const useSidebarViewStore = create<SidebarViewStoreState>()(
   persist(
     (set) => ({
-      sortMode: "recent",
+      sortMode: "manual",
       setSortMode: (sortMode) => set({ sortMode }),
       showBackground: false,
       groupMode: "project",

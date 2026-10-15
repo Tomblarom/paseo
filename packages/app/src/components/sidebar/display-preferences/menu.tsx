@@ -122,11 +122,6 @@ const TRAILING_ICONS: Record<SidebarTrailingChoice, OptionIcon> = {
 };
 
 const GROUPING_MODES: readonly SidebarGroupMode[] = ["project", "status"];
-const SORT_MODES: readonly SidebarSortMode[] = ["recent", "manual"];
-const SORT_ICONS: Record<SidebarSortMode, OptionIcon> = {
-  recent: withUnistyles(Clock),
-  manual: withUnistyles(Folder),
-};
 const SORT_LABEL_KEYS: Record<SidebarSortMode, string> = {
   recent: "sidebar.display.sorting.recent",
   manual: "sidebar.display.sorting.manual",
@@ -204,16 +199,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
       {
         id: "sorting",
         title: t("sidebar.display.sorting.label"),
-        content: (
-          <OptionList
-            values={SORT_MODES}
-            icons={SORT_ICONS}
-            labelKeys={SORT_LABEL_KEYS}
-            selectedValue={preferences.sortMode}
-            onSelect={preferences.setSortMode}
-            testIDPrefix="sidebar-sorting"
-          />
-        ),
+        content: <SortingPage preferences={preferences} />,
       },
       {
         id: "grouping",
@@ -341,7 +327,13 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
           </MenuSubTrigger>
           <MenuSubTrigger
             id="sorting"
-            value={t(SORT_LABEL_KEYS[preferences.sortMode])}
+            value={t(
+              SORT_LABEL_KEYS[
+                preferences.sortMode === "recent" || preferences.projectSortMode === "recent"
+                  ? "recent"
+                  : "manual"
+              ],
+            )}
             testID="sidebar-display-sorting"
           >
             {t("sidebar.display.sorting.label")}
@@ -575,6 +567,36 @@ function OptionList<Value extends string>({
       testID={`${testIDPrefix}-${value}`}
     />
   ));
+}
+
+function SortingPage({ preferences }: { preferences: Preferences }): ReactElement {
+  const { t } = useTranslation();
+  const toggleWorkspaces = useCallback(() => {
+    preferences.setSortMode(preferences.sortMode === "recent" ? "manual" : "recent");
+  }, [preferences]);
+  const toggleProjects = useCallback(() => {
+    preferences.setProjectSortMode(preferences.projectSortMode === "recent" ? "manual" : "recent");
+  }, [preferences]);
+  return (
+    <>
+      <MenuItem
+        selected={preferences.sortMode === "recent"}
+        closeOnSelect={false}
+        onSelect={toggleWorkspaces}
+        testID="sidebar-sorting-workspaces"
+      >
+        {t("sidebar.display.sorting.workspaces")}
+      </MenuItem>
+      <MenuItem
+        selected={preferences.projectSortMode === "recent"}
+        closeOnSelect={false}
+        onSelect={toggleProjects}
+        testID="sidebar-sorting-projects"
+      >
+        {t("sidebar.display.sorting.projects")}
+      </MenuItem>
+    </>
+  );
 }
 
 /**

@@ -1154,6 +1154,8 @@ export const ar: TranslationResources = {
     },
     display: {
       sorting: {
+        workspaces: "مساحات العمل حسب النشاط",
+        projects: "المشاريع حسب النشاط",
         label: "ترتيب حسب",
         recent: "النشاط الأخير",
         manual: "ترتيب يدوي",

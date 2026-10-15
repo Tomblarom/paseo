@@ -31,16 +31,65 @@ function createMemoryStorage(entries: Record<string, string | null>): MemoryStor
 
 describe("sidebar view store", () => {
   it("keeps manual ordering by default for fresh and existing installations", () => {
-    expect(useSidebarViewStore.getInitialState().sortMode).toBe("manual");
+    expect(useSidebarViewStore.getInitialState()).toMatchObject({
+      sortMode: "manual",
+      projectSortMode: "manual",
+    });
     expect(migrateSidebarViewState({}).sortMode).toBe("manual");
     expect(migrateSidebarViewState({ groupMode: "status", hostFilters: ["host-a"] })).toMatchObject(
       {
         sortMode: "manual",
+        projectSortMode: "manual",
         groupMode: "status",
         hostFilters: ["host-a"],
       },
     );
   });
+  it("preserves both levels for a saved activity preference from version 8", () => {
+    expect(migrateSidebarViewState({ sortMode: "recent" })).toMatchObject({
+      sortMode: "recent",
+      projectSortMode: "recent",
+    });
+  });
+
+  it("preserves an explicit activity choice alongside legacy grouping", () => {
+    expect(
+      migrateSidebarViewState({
+        groupModeByServerId: { "host-a": "status" },
+        sortMode: "recent",
+        projectSortMode: "manual",
+      }),
+    ).toMatchObject({ groupMode: "status", sortMode: "recent", projectSortMode: "manual" });
+  });
+
+  it("persists independent project and workspace preferences", () => {
+    for (const sortMode of ["manual", "recent"] as const) {
+      for (const projectSortMode of ["manual", "recent"] as const) {
+        expect(migrateSidebarViewState({ sortMode, projectSortMode })).toMatchObject({
+          sortMode,
+          projectSortMode,
+        });
+      }
+    }
+    const store = useSidebarViewStore.getState();
+    store.setSortMode("recent");
+    expect(useSidebarViewStore.getState()).toMatchObject({
+      sortMode: "recent",
+      projectSortMode: "manual",
+    });
+    store.setProjectSortMode("recent");
+    store.setSortMode("manual");
+    expect(useSidebarViewStore.getState()).toMatchObject({
+      sortMode: "manual",
+      projectSortMode: "recent",
+    });
+    store.setProjectSortMode("manual");
+    expect(useSidebarViewStore.getState()).toMatchObject({
+      sortMode: "manual",
+      projectSortMode: "manual",
+    });
+  });
+
   it("persists recent-activity sorting and allows manual order again", () => {
     useSidebarViewStore.getState().setSortMode("recent");
     expect(useSidebarViewStore.getState().sortMode).toBe("recent");
@@ -53,6 +102,7 @@ describe("sidebar view store", () => {
   beforeEach(() => {
     useSidebarViewStore.setState({
       sortMode: "manual",
+      projectSortMode: "manual",
       showBackground: false,
       groupMode: "project",
       hostFilters: [],
@@ -107,6 +157,7 @@ describe("sidebar view store", () => {
       }),
     ).toEqual({
       sortMode: "manual",
+      projectSortMode: "manual",
       showBackground: false,
       groupMode: "status",
       hostFilters: [],
@@ -123,6 +174,7 @@ describe("sidebar view store", () => {
       }),
     ).toEqual({
       sortMode: "manual",
+      projectSortMode: "manual",
       showBackground: false,
       groupMode: "status",
       hostFilters: ["host-a"],
@@ -139,6 +191,7 @@ describe("sidebar view store", () => {
       }),
     ).toEqual({
       sortMode: "manual",
+      projectSortMode: "manual",
       showBackground: false,
       groupMode: "status",
       hostFilters: ["host-a", "host-b"],
@@ -251,6 +304,7 @@ describe("sidebar view store", () => {
       }),
     ).toEqual({
       sortMode: "manual",
+      projectSortMode: "manual",
       showBackground: false,
       groupMode: "project",
       hostFilters: ["host-a"],
@@ -262,6 +316,7 @@ describe("sidebar view store", () => {
   it("never keeps project filters from state the schema rejects", () => {
     expect(migrateSidebarViewState({ projectFilters: "project-a" })).toEqual({
       sortMode: "manual",
+      projectSortMode: "manual",
       showBackground: false,
       groupMode: "project",
       hostFilters: [],

@@ -10,7 +10,7 @@ export type SidebarSortMode = "recent" | "manual";
 
 const SIDEBAR_VIEW_STORAGE_KEY = "sidebar-view";
 const LEGACY_SIDEBAR_GROUP_MODE_STORAGE_KEY = "sidebar-group-mode";
-const SIDEBAR_VIEW_STORE_VERSION = 8;
+const SIDEBAR_VIEW_STORE_VERSION = 9;
 
 /**
  * The key standing for "this workspace carries no labels at all".
@@ -47,8 +47,11 @@ function toggleFilterEntry(list: readonly string[], key: string): string[] {
 }
 
 interface SidebarViewStoreState {
+  /** Ordering within projects and status groups. */
   sortMode: SidebarSortMode;
+  projectSortMode: SidebarSortMode;
   setSortMode: (mode: SidebarSortMode) => void;
+  setProjectSortMode: (mode: SidebarSortMode) => void;
   groupMode: SidebarGroupMode;
   showBackground: boolean;
   // Empty means "all hosts". A non-empty list pins the sidebar to those hosts.
@@ -79,6 +82,7 @@ interface SidebarViewStoreState {
 
 interface SidebarViewPersistedState {
   sortMode: SidebarSortMode;
+  projectSortMode: SidebarSortMode;
   groupMode: SidebarGroupMode;
   showBackground: boolean;
   hostFilters: string[];
@@ -92,6 +96,7 @@ const SidebarLabelFilterSchema = z.object({
 });
 const SidebarViewPersistedStateSchema = z.strictObject({
   sortMode: z.enum(["recent", "manual"]).optional(),
+  projectSortMode: z.enum(["recent", "manual"]).optional(),
   showBackground: z.boolean().optional(),
   groupMode: PersistedSidebarGroupModeSchema.optional(),
   hostFilters: z.array(z.string()).optional(),
@@ -132,6 +137,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   if (!result.success) {
     return {
       sortMode: "manual",
+      projectSortMode: "manual",
       showBackground: false,
       groupMode: "project",
       hostFilters: [],
@@ -144,7 +150,8 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   const legacyGroupMode = readLegacyGroupMode(state);
   if (legacyGroupMode) {
     return {
-      sortMode: "manual",
+      sortMode: state.sortMode ?? "manual",
+      projectSortMode: state.projectSortMode ?? state.sortMode ?? "manual",
       showBackground: false,
       groupMode: legacyGroupMode,
       hostFilters: [],
@@ -155,6 +162,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
 
   return {
     sortMode: state.sortMode ?? "manual",
+    projectSortMode: state.projectSortMode ?? state.sortMode ?? "manual",
     showBackground: state.showBackground ?? false,
     groupMode: state.groupMode === "status" ? "status" : "project",
     hostFilters: readHostFilters(state),
@@ -194,7 +202,9 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
   persist(
     (set) => ({
       sortMode: "manual",
+      projectSortMode: "manual",
       setSortMode: (sortMode) => set({ sortMode }),
+      setProjectSortMode: (projectSortMode) => set({ projectSortMode }),
       showBackground: false,
       groupMode: "project",
       hostFilters: [],
@@ -248,6 +258,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       ),
       partialize: (state) => ({
         sortMode: state.sortMode,
+        projectSortMode: state.projectSortMode,
         showBackground: state.showBackground ?? false,
         groupMode: state.groupMode,
         hostFilters: state.hostFilters,

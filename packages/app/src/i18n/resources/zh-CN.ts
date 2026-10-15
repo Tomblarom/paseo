@@ -1146,6 +1146,8 @@ export const zhCN: TranslationResources = {
     },
     display: {
       sorting: {
+        workspaces: "工作区按活动排序",
+        projects: "项目按活动排序",
         label: "排序方式",
         recent: "最近活动",
         manual: "手动排序",

@@ -1161,6 +1161,8 @@ export const ko: TranslationResources = {
     },
     display: {
       sorting: {
+        workspaces: "활동순 워크스페이스",
+        projects: "활동순 프로젝트",
         label: "정렬 기준",
         recent: "최근 활동",
         manual: "수동 순서",

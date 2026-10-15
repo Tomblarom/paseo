@@ -1190,6 +1190,8 @@ export const es: TranslationResources = {
     },
     display: {
       sorting: {
+        workspaces: "Espacios por actividad",
+        projects: "Proyectos por actividad",
         label: "Ordenar por",
         recent: "Actividad reciente",
         manual: "Orden manual",

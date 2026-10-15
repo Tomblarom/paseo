@@ -499,26 +499,33 @@ export function shouldShowSidebarHostLabels(projects: SidebarProjectEntry[]): bo
 export function sortSidebarProjectsByActivity(
   projects: readonly SidebarProjectEntry[],
   entries: ReadonlyMap<string, SidebarWorkspaceEntry>,
+  levels = { workspaces: true, projects: true },
 ): SidebarProjectEntry[] {
+  if (!levels.workspaces && !levels.projects) return [...projects];
   const activityByKey = new Map<string, number>();
   for (const [key, entry] of entries) activityByKey.set(key, entry.activityAt?.getTime() ?? 0);
   const projectActivity = new Map<string, number>();
   const sorted = projects.map((project) => {
     const workspaces = [...project.workspaces];
-    workspaces.sort(
-      (left, right) =>
-        (activityByKey.get(right.workspaceKey) ?? 0) - (activityByKey.get(left.workspaceKey) ?? 0),
-    );
+    if (levels.workspaces) {
+      workspaces.sort(
+        (left, right) =>
+          (activityByKey.get(right.workspaceKey) ?? 0) -
+          (activityByKey.get(left.workspaceKey) ?? 0),
+      );
+    }
     let latest = 0;
     for (const workspace of workspaces)
       latest = Math.max(latest, activityByKey.get(workspace.workspaceKey) ?? 0);
     projectActivity.set(project.viewKey, latest);
     return { ...project, workspaces };
   });
-  sorted.sort(
-    (left, right) =>
-      (projectActivity.get(right.viewKey) ?? 0) - (projectActivity.get(left.viewKey) ?? 0),
-  );
+  if (levels.projects) {
+    sorted.sort(
+      (left, right) =>
+        (projectActivity.get(right.viewKey) ?? 0) - (projectActivity.get(left.viewKey) ?? 0),
+    );
+  }
   return sorted;
 }
 

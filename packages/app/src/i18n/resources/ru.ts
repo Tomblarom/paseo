@@ -1171,6 +1171,8 @@ export const ru: TranslationResources = {
     },
     display: {
       sorting: {
+        workspaces: "Рабочие области по активности",
+        projects: "Проекты по активности",
         label: "Сортировка",
         recent: "Недавняя активность",
         manual: "Вручную",

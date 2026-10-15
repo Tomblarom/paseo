@@ -9,6 +9,39 @@ import { buildSidebarProjection } from "./sidebar-projection";
 import { sortSidebarProjectsByActivity } from "@/hooks/sidebar-workspaces-view-model";
 
 describe("recent workspace ordering", () => {
+  it.each([
+    { workspaces: false, projects: false },
+    { workspaces: true, projects: false },
+    { workspaces: false, projects: true },
+    { workspaces: true, projects: true },
+  ])("sorts only the enabled levels: %j", (levels) => {
+    const first = makeWorkspace("first");
+    const second = makeWorkspace("second", "done", [], "second-project");
+    const active = makeWorkspace("active", "done", [], "second-project");
+    first.entry.activityAt = new Date(10);
+    second.entry.activityAt = new Date(20);
+    active.entry.activityAt = new Date(30);
+    const projects = [
+      makeProject([first.placement]),
+      makeProject([second.placement, active.placement], "second-project"),
+    ];
+    const entries = new Map(
+      [first, second, active].map(({ entry }) => [entry.workspaceKey, entry]),
+    );
+    const result = sortSidebarProjectsByActivity(projects, entries, levels);
+    expect(result.map((project) => project.viewKey)).toEqual(
+      levels.projects ? ["second-project", "project"] : ["project", "second-project"],
+    );
+    expect(
+      result
+        .find((project) => project.viewKey === "second-project")!
+        .workspaces.map((workspace) => workspace.workspaceId),
+    ).toEqual(levels.workspaces ? ["active", "second"] : ["second", "active"]);
+    expect(projects[1].workspaces.map((workspace) => workspace.workspaceId)).toEqual([
+      "second",
+      "active",
+    ]);
+  });
   it("moves recently active workspaces and their projects above older and unused ones", () => {
     const older = makeWorkspace("older");
     const recent = makeWorkspace("recent", "done", [], "other-project");

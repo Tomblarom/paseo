@@ -64,6 +64,7 @@ export function SidebarModelProvider({
   const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarViewStore((state) => state.groupMode);
   const sortMode = useSidebarViewStore((state) => state.sortMode);
+  const projectSortMode = useSidebarViewStore((state) => state.projectSortMode);
   const projectOrder = useSidebarOrderStore((state) => state.projectOrder);
   const workspaceOrderByProject = useSidebarOrderStore((state) => state.workspaceOrderByProject);
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
@@ -158,9 +159,10 @@ export function SidebarModelProvider({
         }),
       }),
     );
-    return sortMode === "recent"
-      ? sortSidebarProjectsByActivity(orderedProjects, filteredWorkspaceEntriesByKey)
-      : orderedProjects;
+    return sortSidebarProjectsByActivity(orderedProjects, filteredWorkspaceEntriesByKey, {
+      workspaces: sortMode === "recent",
+      projects: projectSortMode === "recent",
+    });
   }, [
     showBackground,
     hasActiveLabelFilter,
@@ -169,6 +171,7 @@ export function SidebarModelProvider({
     list.projects,
     visibleWorkspaceKeys,
     sortMode,
+    projectSortMode,
     projectOrder,
     workspaceOrderByProject,
     filteredWorkspaceEntriesByKey,

@@ -1162,6 +1162,8 @@ export const en = {
     },
     display: {
       sorting: {
+        workspaces: "Workspaces by activity",
+        projects: "Projects by activity",
         label: "Sort by",
         recent: "Recent activity",
         manual: "Manual order",

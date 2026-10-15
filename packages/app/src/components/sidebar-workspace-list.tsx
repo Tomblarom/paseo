@@ -2207,7 +2207,7 @@ function ProjectModeList({
     (reorderedProjects: SidebarProjectEntry[]) => {
       const reorderedProjectKeys = reorderedProjects.map((project) => project.viewKey);
       const currentProjectOrder = getProjectOrder();
-      const sortByRecentActivity = useSidebarViewStore.getState().sortMode === "recent";
+      const sortByRecentActivity = useSidebarViewStore.getState().projectSortMode === "recent";
       if (
         !sortByRecentActivity &&
         !hasVisibleOrderChanged({
@@ -2224,7 +2224,7 @@ function ProjectModeList({
           reorderedVisibleKeys: reorderedProjectKeys,
         }),
       );
-      useSidebarViewStore.getState().setSortMode("manual");
+      useSidebarViewStore.getState().setProjectSortMode("manual");
     },
     [getProjectOrder, setProjectOrder],
   );

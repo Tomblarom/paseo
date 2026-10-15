@@ -1167,6 +1167,8 @@ export const ja: TranslationResources = {
     },
     display: {
       sorting: {
+        workspaces: "ワークスペースをアクティビティ順に",
+        projects: "プロジェクトをアクティビティ順に",
         label: "並び順",
         recent: "最近のアクティビティ",
         manual: "手動順",

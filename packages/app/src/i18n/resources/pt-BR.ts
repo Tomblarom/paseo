@@ -1180,6 +1180,8 @@ export const ptBR: TranslationResources = {
     },
     display: {
       sorting: {
+        workspaces: "Espaços por atividade",
+        projects: "Projetos por atividade",
         label: "Ordenar por",
         recent: "Atividade recente",
         manual: "Ordem manual",

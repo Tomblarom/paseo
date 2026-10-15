@@ -26,7 +26,10 @@ test("recent-activity sorting follows chat activity, preserves pins, and survive
     const rows = page.locator(`[data-testid="${olderId}"], [data-testid="${newerId}"]`);
     await page.getByTestId("sidebar-display-preferences-menu").click();
     await page.getByTestId("sidebar-display-sorting").click();
-    await page.getByTestId("sidebar-sorting-recent").click();
+    await page.getByTestId("sidebar-sorting-workspaces").click();
+    await page.getByTestId("sidebar-sorting-projects").click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
     await expect.poll(() => rowTestIds(rows)).toEqual([newerId, olderId]);
 
     await older.client.sendAgentMessage(older.agentId, "Reply with hello.");
@@ -39,6 +42,114 @@ test("recent-activity sorting follows chat activity, preserves pins, and survive
   } finally {
     await older.cleanup();
     await newer.cleanup();
+  }
+});
+
+test("activity sorting has independent workspace and project scopes", async ({ page }) => {
+  const first = await seedMockAgentWorkspace({ repoPrefix: "scope-first-", title: "First chat" });
+  const other = await seedMockAgentWorkspace({
+    repoPrefix: "scope-other-",
+    title: "Other project",
+  });
+  try {
+    const descriptor = (await first.client.fetchWorkspaces()).entries.find(
+      (workspace) => workspace.id === first.workspaceId,
+    )!;
+    const sibling = await first.client.createWorkspace({
+      source: { kind: "directory", path: first.cwd, projectId: descriptor.projectId },
+      title: "Second workspace",
+    });
+    if (!sibling.workspace) throw new Error(sibling.error ?? "Failed to create sibling");
+    const agent = await first.client.createAgent({
+      provider: "mock",
+      workspaceId: sibling.workspace.id,
+      cwd: first.cwd,
+      title: "Sibling chat",
+      modeId: "load-test",
+      model: "e2e-fast-stream",
+    });
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    const projectRows = page.getByTestId(/^sidebar-project-row-/);
+    await expect(projectRows).toHaveCount(2);
+    const manualProjectOrder = await rowTestIds(projectRows);
+    const firstId = `sidebar-workspace-row-${getServerId()}:${first.workspaceId}`;
+    const siblingId = `sidebar-workspace-row-${getServerId()}:${sibling.workspace.id}`;
+    const workspaceRows = page.locator(`[data-testid="${firstId}"], [data-testid="${siblingId}"]`);
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await page.getByTestId("sidebar-display-sorting").click();
+    await expect(page.getByTestId("sidebar-sorting-workspaces")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await expect(page.getByTestId("sidebar-sorting-projects")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await page.getByTestId("sidebar-sorting-workspaces").click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+
+    await first.client.sendAgentMessage(first.agentId, "Reply with hello.");
+    await first.client.waitForAgentUpsert(
+      first.agentId,
+      (snapshot) => snapshot.status === "idle",
+      15_000,
+    );
+    await expect.poll(() => rowTestIds(workspaceRows)).toEqual([firstId, siblingId]);
+    await first.client.sendAgentMessage(agent.id, "Reply with hello.");
+    await first.client.waitForAgentUpsert(
+      agent.id,
+      (snapshot) => snapshot.status === "idle",
+      15_000,
+    );
+    await expect.poll(() => rowTestIds(workspaceRows)).toEqual([siblingId, firstId]);
+    expect(await rowTestIds(projectRows)).toEqual(manualProjectOrder);
+    await page.reload();
+    await waitForSidebarHydration(page);
+    await expect.poll(() => rowTestIds(workspaceRows)).toEqual([siblingId, firstId]);
+    expect(await rowTestIds(projectRows)).toEqual(manualProjectOrder);
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await page.getByTestId("sidebar-display-sorting").click();
+    await expect(page.getByTestId("sidebar-sorting-workspaces")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await expect(page.getByTestId("sidebar-sorting-projects")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await page.getByTestId("sidebar-sorting-projects").click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await quickDragFirstRowAfterSecond(projectRows, pressProjectRow);
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await page.getByTestId("sidebar-display-sorting").click();
+    await expect(page.getByTestId("sidebar-sorting-workspaces")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await expect(page.getByTestId("sidebar-sorting-projects")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await page.getByTestId("sidebar-sorting-projects").click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await quickDragFirstRowAfterSecond(workspaceRows, pressWorkspaceRow);
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await page.getByTestId("sidebar-display-sorting").click();
+    await expect(page.getByTestId("sidebar-sorting-workspaces")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await expect(page.getByTestId("sidebar-sorting-projects")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  } finally {
+    await first.cleanup();
+    await other.cleanup();
   }
 });
 

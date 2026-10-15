@@ -1162,6 +1162,7 @@ export const en = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "Project grouping only",
         name: "Name",
         workspaces: "Sort workspaces by",
         projects: "Sort projects by",
@@ -2069,6 +2070,8 @@ export const en = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint:
+        "Group by Project to enable project activity sorting. Your saved choice is retained.",
       sorting: "Activity sorting",
       workspaceRunningFirst: "Prioritize running agents in workspaces",
       projectRunningFirst: "Prioritize running agents in projects",

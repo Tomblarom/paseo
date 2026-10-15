@@ -1167,6 +1167,7 @@ export const ja: TranslationResources = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "プロジェクト別のみ",
         name: "名前",
         workspaces: "ワークスペースの並び順",
         projects: "プロジェクトの並び順",
@@ -2065,6 +2066,8 @@ export const ja: TranslationResources = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint:
+        "プロジェクトのアクティビティ順を有効にするには、プロジェクト別にグループ化してください。設定は保持されます。",
       sorting: "アクティビティによる並び替え",
       workspaceRunningFirst: "ワークスペース内の実行中エージェントを優先",
       projectRunningFirst: "プロジェクト内の実行中エージェントを優先",

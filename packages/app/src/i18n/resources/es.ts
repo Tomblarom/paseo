@@ -1190,6 +1190,7 @@ export const es: TranslationResources = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "Solo por proyecto",
         name: "Nombre",
         workspaces: "Ordenar espacios por",
         projects: "Ordenar proyectos por",
@@ -2092,6 +2093,8 @@ export const es: TranslationResources = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint:
+        "Agrupa por Proyecto para activar el orden de proyectos por actividad. Se conserva tu selección.",
       sorting: "Orden por actividad",
       workspaceRunningFirst: "Priorizar agentes activos en espacios",
       projectRunningFirst: "Priorizar agentes activos en proyectos",

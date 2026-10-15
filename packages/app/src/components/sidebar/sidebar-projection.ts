@@ -41,6 +41,7 @@ export interface SidebarProjectionInput {
   projects: SidebarProjectEntry[];
   pinnedKeys: PinnedSidebarKeys;
   pinnedWorkspaceOrder: string[];
+  workspaceOrderByStatus?: Readonly<Record<string, string[]>>;
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   projectNamesByViewKey: Map<string, string>;
   groupMode: SidebarGroupMode;
@@ -59,7 +60,12 @@ export function buildSidebarProjection(input: SidebarProjectionInput): SidebarPr
     pinnedWorkspaceOrder: input.pinnedWorkspaceOrder,
   });
   if (input.sortMode === "name")
-    pinnedGroups.pinnedChats.sort((left, right) => compareSidebarNames(left.name, right.name));
+    pinnedGroups.pinnedChats.sort((left, right) =>
+      compareSidebarNames(
+        input.workspaceEntriesByKey.get(left.workspaceKey)?.name ?? left.name,
+        input.workspaceEntriesByKey.get(right.workspaceKey)?.name ?? right.name,
+      ),
+    );
   const pinnedWorkspaceKeys = new Set(input.pinnedKeys.pinnedWorkspaceKeys);
   const unpinnedWorkspaces = Array.from(input.workspaceEntriesByKey.values()).filter(
     (workspace) => !pinnedWorkspaceKeys.has(workspace.workspaceKey),
@@ -107,13 +113,14 @@ function buildWorkspaceGroups(
       return [];
     case "status":
       return statusWorkspaceGroups(
-        buildStatusGroups(
-          unpinnedWorkspaces,
-          input.projectNamesByViewKey,
-          input.t,
-          input.sortMode,
-          input.workspaceActivityRunningFirst,
-        ),
+        buildStatusGroups({
+          workspaces: unpinnedWorkspaces,
+          projectNamesByViewKey: input.projectNamesByViewKey,
+          t: input.t,
+          sortMode: input.sortMode,
+          runningFirst: input.workspaceActivityRunningFirst,
+          workspaceOrderByStatus: input.workspaceOrderByStatus,
+        }),
       );
   }
 }

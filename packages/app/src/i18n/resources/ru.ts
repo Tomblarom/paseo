@@ -1171,6 +1171,7 @@ export const ru: TranslationResources = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "Только по проектам",
         name: "Имя",
         workspaces: "Сортировать рабочие области по",
         projects: "Сортировать проекты по",
@@ -2077,6 +2078,8 @@ export const ru: TranslationResources = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint:
+        "Для сортировки проектов по активности выберите группировку по проектам. Ваш выбор сохраняется.",
       sorting: "Сортировка по активности",
       workspaceRunningFirst: "Приоритет активных агентов в рабочих областях",
       projectRunningFirst: "Приоритет активных агентов в проектах",

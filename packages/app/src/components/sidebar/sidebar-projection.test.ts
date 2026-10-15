@@ -9,6 +9,22 @@ import { buildSidebarProjection } from "./sidebar-projection";
 import { sortSidebarProjects } from "@/hooks/sidebar-workspaces-view-model";
 
 describe("recent workspace ordering", () => {
+  it("retains structural references when sorting does not change the visible order", () => {
+    const workspace = makeWorkspace("one");
+    const projects = [makeProject([workspace.placement])];
+    const entries = new Map([[workspace.entry.workspaceKey, workspace.entry]]);
+    expect(
+      sortSidebarProjects(projects, entries, { workspaces: "manual", projects: "manual" }),
+    ).toBe(projects);
+    expect(
+      sortSidebarProjects(projects, entries, { workspaces: "recent", projects: "manual" })[0],
+    ).toBe(projects[0]);
+    expect(
+      sortSidebarProjects(projects, entries, { workspaces: "manual", projects: "name" })[0]
+        .workspaces,
+    ).toBe(projects[0].workspaces);
+  });
+
   it.each([
     { workspaces: "manual", projects: "manual" },
     { workspaces: "recent", projects: "manual" },
@@ -18,9 +34,9 @@ describe("recent workspace ordering", () => {
     const first = makeWorkspace("first");
     const second = makeWorkspace("second", "done", [], "second-project");
     const active = makeWorkspace("active", "done", [], "second-project");
-    first.entry.activityAt = new Date(10);
-    second.entry.activityAt = new Date(20);
-    active.entry.activityAt = new Date(30);
+    first.entry.lastStartedAt = new Date(10);
+    second.entry.lastStartedAt = new Date(20);
+    active.entry.lastStartedAt = new Date(30);
     const projects = [
       makeProject([first.placement]),
       makeProject([second.placement, active.placement], "second-project"),
@@ -70,7 +86,6 @@ describe("recent workspace ordering", () => {
     older.entry.hasRunningAgent = true;
     latest.entry.lastStartedAt = new Date(20);
     latest.entry.hasRunningAgent = true;
-    latest.entry.activityAt = new Date(999);
     const projects = [
       makeProject([older.placement]),
       makeProject([latest.placement], "latest-project"),
@@ -98,7 +113,7 @@ describe("recent workspace ordering", () => {
         workspaceRunningFirst ? ["older", "latest"] : ["latest", "older"],
       );
     }
-    const empty = { ...latest.entry, lastStartedAt: null, activityAt: new Date(9999) };
+    const empty = { ...latest.entry, lastStartedAt: null };
     expect(
       sortSidebarProjects(
         [makeProject([latest.placement, older.placement])],
@@ -116,8 +131,8 @@ describe("recent workspace ordering", () => {
     const recent = makeWorkspace("recent", "done", [], "other-project");
     const unused = makeWorkspace("unused", "done", [], "empty-project");
     const unusedSibling = makeWorkspace("unused-sibling", "done", [], "other-project");
-    older.entry.activityAt = new Date("2026-10-10T12:00:00Z");
-    recent.entry.activityAt = new Date("2026-10-14T12:00:00Z");
+    older.entry.lastStartedAt = new Date("2026-10-10T12:00:00Z");
+    recent.entry.lastStartedAt = new Date("2026-10-14T12:00:00Z");
     const projects = [
       makeProject([unused.placement], "empty-project"),
       makeProject([older.placement]),
@@ -145,8 +160,8 @@ describe("recent workspace ordering", () => {
   it("keeps the existing order for equal or missing activity timestamps", () => {
     const first = makeWorkspace("first");
     const second = makeWorkspace("second");
-    first.entry.activityAt = new Date("2026-10-14T12:00:00Z");
-    second.entry.activityAt = new Date("2026-10-14T12:00:00Z");
+    first.entry.lastStartedAt = new Date("2026-10-14T12:00:00Z");
+    second.entry.lastStartedAt = new Date("2026-10-14T12:00:00Z");
     const entries = new Map([first, second].map(({ entry }) => [entry.workspaceKey, entry]));
     const sorted = sortSidebarProjects(
       [makeProject([second.placement, first.placement])],
@@ -272,6 +287,71 @@ function twoProjectInput(groupMode: "project" | "status") {
 }
 
 describe("buildSidebarProjection", () => {
+  it.each(["project", "status"] as const)(
+    "sorts pinned %s rows by hydrated names, not opaque ids",
+    (groupMode) => {
+      const first = makeWorkspace("aaa-id");
+      const second = makeWorkspace("zzz-id");
+      first.entry.name = "Workspace 10";
+      second.entry.name = "Workspace 2";
+      const projection = buildSidebarProjection({
+        ...projectionInput({ groupMode }),
+        sortMode: "name",
+        projects: [makeProject([first.placement, second.placement])],
+        pinnedKeys: {
+          pinnedWorkspaceKeys: [first.entry.workspaceKey, second.entry.workspaceKey],
+          pinnedAtByKey: {},
+        },
+        pinnedWorkspaceOrder: [first.entry.workspaceKey, second.entry.workspaceKey],
+        workspaceEntriesByKey: new Map(
+          [first, second].map(({ entry }) => [entry.workspaceKey, entry]),
+        ),
+      });
+      expect(projection.pinnedGroups.pinnedChats.map((w) => w.workspaceId)).toEqual([
+        "zzz-id",
+        "aaa-id",
+      ]);
+      expect(projection.shortcutModel.shortcutTargets.map((w) => w.workspaceId)).toEqual([
+        "zzz-id",
+        "aaa-id",
+      ]);
+    },
+  );
+
+  it("restores manual status order independently of project order and status timestamps", () => {
+    const first = makeWorkspace("first");
+    const second = makeWorkspace("second");
+    const urgent = makeWorkspace("urgent", "needs_input");
+    first.entry.statusEnteredAt = new Date(30);
+    second.entry.statusEnteredAt = new Date(10);
+    const input = {
+      ...projectionInput({ groupMode: "status" }),
+      sortMode: "manual" as const,
+      projects: [makeProject([first.placement, second.placement, urgent.placement])],
+      pinnedKeys: { pinnedWorkspaceKeys: [], pinnedAtByKey: {} },
+      workspaceEntriesByKey: new Map(
+        [first, second, urgent].map(({ entry }) => [entry.workspaceKey, entry]),
+      ),
+      workspaceOrderByStatus: { done: [second.entry.workspaceKey, first.entry.workspaceKey] },
+    };
+    const projection = buildSidebarProjection(input);
+    expect(projection.workspaceGroups.map((g) => g.key)).toEqual(["needs_input", "done"]);
+    expect(projection.workspaceGroups[1].rows.map((w) => w.workspaceId)).toEqual([
+      "second",
+      "first",
+    ]);
+    expect(projection.shortcutModel.shortcutTargets.map((w) => w.workspaceId)).toEqual([
+      "urgent",
+      "second",
+      "first",
+    ]);
+    const collapsed = buildSidebarProjection({
+      ...input,
+      collapsedWorkspaceGroupKeys: new Set(["done"]),
+    });
+    expect(collapsed.shortcutModel.shortcutTargets.map((w) => w.workspaceId)).toEqual(["urgent"]);
+  });
+
   // The rule that outlived the bug it was written for: a project icon is fetched per project, so
   // whatever a mode groups by, the rows it produces can only reference projects already covered.
   for (const groupMode of ["project", "status"] as const) {

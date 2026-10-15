@@ -1940,6 +1940,7 @@ export function SidebarWorkspaceList({
           reorderedVisibleKeys: reorderedWorkspaceKeys,
         }),
       );
+      useSidebarViewStore.getState().setSortMode("manual");
     },
     [getPinnedWorkspaceOrder, setPinnedWorkspaceOrder],
   );

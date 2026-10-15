@@ -1154,6 +1154,7 @@ export const ar: TranslationResources = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "تجميع المشاريع فقط",
         name: "الاسم",
         workspaces: "ترتيب مساحات العمل حسب",
         projects: "ترتيب المشاريع حسب",
@@ -2044,6 +2045,8 @@ export const ar: TranslationResources = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint:
+        "جمّع حسب المشروع لتفعيل ترتيب المشاريع حسب النشاط. سيتم الاحتفاظ باختيارك.",
       sorting: "الترتيب حسب النشاط",
       workspaceRunningFirst: "إعطاء أولوية للوكلاء النشطين في مساحات العمل",
       projectRunningFirst: "إعطاء أولوية للوكلاء النشطين في المشاريع",

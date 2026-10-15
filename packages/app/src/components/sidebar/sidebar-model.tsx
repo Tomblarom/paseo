@@ -70,6 +70,7 @@ export function SidebarModelProvider({
   const projectSortMode = useSidebarViewStore((state) => state.projectSortMode);
   const projectOrder = useSidebarOrderStore((state) => state.projectOrder);
   const workspaceOrderByProject = useSidebarOrderStore((state) => state.workspaceOrderByProject);
+  const workspaceOrderByStatus = useSidebarOrderStore((state) => state.workspaceOrderByStatus);
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
   const projectFilters = useSidebarViewStore((state) => state.projectFilters);
   const reconcileLabelFilter = useSidebarViewStore((state) => state.reconcileLabelFilter);
@@ -189,6 +190,7 @@ export function SidebarModelProvider({
       projects: filteredProjects,
       pinnedKeys,
       pinnedWorkspaceOrder,
+      workspaceOrderByStatus,
       workspaceEntriesByKey: filteredWorkspaceEntriesByKey,
       projectNamesByViewKey: list.projectNamesByViewKey,
       groupMode,
@@ -210,6 +212,7 @@ export function SidebarModelProvider({
       pinnedCollapsed,
       pinnedKeys,
       pinnedWorkspaceOrder,
+      workspaceOrderByStatus,
       filteredWorkspaceEntriesByKey,
       t,
     ],

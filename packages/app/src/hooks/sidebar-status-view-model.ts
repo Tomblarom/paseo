@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { STATUS_BUCKET_ORDER } from "@/utils/sidebar-agent-state";
 import {
+  applyStoredOrdering,
   compareSidebarActivity,
   compareSidebarNames,
   type SidebarWorkspaceEntry,
@@ -29,13 +30,15 @@ export interface StatusGroup {
   rows: SidebarWorkspaceEntry[];
 }
 
-export function buildStatusGroups(
-  workspaces: SidebarWorkspaceEntry[],
-  projectNamesByViewKey: Map<string, string>,
-  t: TFunction,
-  sortMode?: SidebarSortMode,
-  runningFirst = false,
-): StatusGroup[] {
+export function buildStatusGroups(input: {
+  workspaces: SidebarWorkspaceEntry[];
+  projectNamesByViewKey: Map<string, string>;
+  t: TFunction;
+  sortMode?: SidebarSortMode;
+  runningFirst?: boolean;
+  workspaceOrderByStatus?: Readonly<Record<string, string[]>>;
+}): StatusGroup[] {
+  const { workspaces, projectNamesByViewKey, t, sortMode = "manual", runningFirst = false } = input;
   const bucketRows = new Map<StatusBucket, SidebarWorkspaceEntry[]>();
 
   for (const ws of workspaces) {
@@ -59,7 +62,15 @@ export function buildStatusGroups(
       if (sortMode === "recent") return compareSidebarActivity(a, b, runningFirst);
       return compareStatusRows(a, b, projectNamesByViewKey);
     });
-    groups.push({ bucket, label: getStatusBucketLabel(bucket, t), rows });
+    const orderedRows =
+      sortMode === "manual"
+        ? applyStoredOrdering({
+            items: rows,
+            storedOrder: input.workspaceOrderByStatus?.[bucket] ?? [],
+            getKey: (row) => row.workspaceKey,
+          })
+        : rows;
+    groups.push({ bucket, label: getStatusBucketLabel(bucket, t), rows: orderedRows });
   }
 
   return groups;

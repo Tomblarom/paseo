@@ -1146,6 +1146,7 @@ export const zhCN: TranslationResources = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "仅按项目分组",
         name: "名称",
         workspaces: "工作区排序方式",
         projects: "项目排序方式",
@@ -2022,6 +2023,7 @@ export const zhCN: TranslationResources = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint: "按项目分组以启用项目活动排序。已保存的选择会保留。",
       sorting: "活动排序",
       workspaceRunningFirst: "优先显示有运行中代理的工作区",
       projectRunningFirst: "优先显示有运行中代理的项目",

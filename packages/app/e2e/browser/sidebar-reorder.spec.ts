@@ -5,6 +5,7 @@ import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { getServerId } from "../support/helpers/server-id";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
+import { selectSidebarStatusGrouping, openSidebarDisplayPage } from "../support/helpers/sidebar";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
 test("recent-activity sorting follows chat activity, preserves pins, and survives reload", async ({
@@ -162,6 +163,137 @@ test("running-first drops finished agents while start-based order survives outpu
     await expect.poll(() => rowTestIds(rows)).toEqual([latestId, oldId]);
   } finally {
     await running.cleanup();
+    await latest.cleanup();
+  }
+});
+
+test("status sorting supports manual drag, hydrated pinned names, collapse, and grouping roundtrips", async ({
+  page,
+}) => {
+  const first = await seedWorkspace({ repoPrefix: "status-sort-first-", title: "Workspace 10" });
+  const second = await seedWorkspace({ repoPrefix: "status-sort-second-", title: "Workspace 2" });
+  try {
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    await chooseSort(page, "project", "recent");
+    await selectSidebarStatusGrouping(page);
+    const firstId = `sidebar-workspace-row-${getServerId()}:${first.workspaceId}`;
+    const secondId = `sidebar-workspace-row-${getServerId()}:${second.workspaceId}`;
+    const done = page.getByTestId("sidebar-status-group-rows-done");
+    const rows = done.locator(`[data-testid="${firstId}"], [data-testid="${secondId}"]`);
+    await chooseSort(page, "workspace", "name");
+    await expect.poll(() => rowTestIds(rows)).toEqual([secondId, firstId]);
+    await attemptBlockedDrag(rows);
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await expect(page.getByTestId("sidebar-display-project-sorting")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await expect(page.getByTestId("sidebar-display-project-sorting")).toContainText(
+      "Project grouping only",
+    );
+    await page.keyboard.press("Escape");
+    await chooseSort(page, "workspace", "recent");
+    await quickDragFirstRowAfterSecond(rows, pressWorkspaceRow);
+    const manualOrder = await rowTestIds(rows);
+    await page.reload();
+    await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
+    await expect.poll(() => rowTestIds(rows)).toEqual(manualOrder);
+    await openWorkspaceSettings(page);
+    await expect(
+      page.getByTestId("settings-workspaces-workspace-running").getByRole("switch"),
+    ).toBeDisabled();
+    const projectSetting = page.getByTestId("settings-workspaces-project-running");
+    await expect(projectSetting.getByRole("switch")).toBeDisabled();
+    await expect(projectSetting).toContainText("Group by Project");
+    await gotoAppShell(page);
+    await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
+    await first.client.setWorkspacePinned(first.workspaceId, true);
+    await second.client.setWorkspacePinned(second.workspaceId, true);
+    await chooseSort(page, "workspace", "name");
+    const pinned = page
+      .getByTestId("sidebar-pinned-section")
+      .locator(`[data-testid="${firstId}"], [data-testid="${secondId}"]`);
+    await expect.poll(() => rowTestIds(pinned)).toEqual([secondId, firstId]);
+    await attemptBlockedDrag(pinned);
+    await chooseSort(page, "workspace", "recent");
+    await quickDragFirstRowAfterSecond(pinned, pressWorkspaceRow);
+    await first.client.setWorkspacePinned(first.workspaceId, false);
+    await second.client.setWorkspacePinned(second.workspaceId, false);
+    await expect.poll(() => rowTestIds(rows)).toEqual(manualOrder);
+    await openSidebarDisplayPage(page, "sidebar-display-grouping");
+    await page.getByTestId("sidebar-grouping-project").click();
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await expect(page.getByTestId("sidebar-display-project-sorting")).toContainText(
+      "Recent activity",
+    );
+    await page.keyboard.press("Escape");
+    await selectSidebarStatusGrouping(page);
+    await expect.poll(() => rowTestIds(rows)).toEqual(manualOrder);
+    await page.getByTestId("sidebar-status-group-done").click();
+    await expect(done).toHaveCount(0);
+    await page.reload();
+    await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
+    await expect(done).toHaveCount(0);
+    await page.getByTestId("sidebar-status-group-done").click();
+    await expect.poll(() => rowTestIds(rows)).toEqual(manualOrder);
+  } finally {
+    await first.cleanup();
+    await second.cleanup();
+  }
+});
+
+test("status sorting preserves bucket priority and last-start order through completion", async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  const older = await seedMockAgentWorkspace({
+    repoPrefix: "status-start-older-",
+    title: "Older start",
+    model: "one-minute-stream",
+  });
+  const latest = await seedMockAgentWorkspace({
+    repoPrefix: "status-start-latest-",
+    title: "Latest start",
+  });
+  try {
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    await selectSidebarStatusGrouping(page);
+    await chooseSort(page, "workspace", "recent");
+    await openWorkspaceSettings(page);
+    await page.getByTestId("settings-workspaces-workspace-running").getByRole("switch").click();
+    await gotoAppShell(page);
+    await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
+    await older.client.sendAgentMessage(older.agentId, "Reply with hello.");
+    await older.client.waitForAgentUpsert(older.agentId, (a) => a.status === "running", 15_000);
+    await latest.client.sendAgentMessage(latest.agentId, "Reply with hello.");
+    await latest.client.waitForAgentUpsert(latest.agentId, (a) => a.status === "idle", 15_000);
+    await latest.client.clearWorkspaceAttention(latest.workspaceId);
+    const olderId = `sidebar-workspace-row-${getServerId()}:${older.workspaceId}`;
+    const latestId = `sidebar-workspace-row-${getServerId()}:${latest.workspaceId}`;
+    const rows = page.locator(`[data-testid="${olderId}"], [data-testid="${latestId}"]`);
+    await expect(
+      page.getByTestId("sidebar-status-group-rows-running").getByTestId(olderId),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("sidebar-status-group-rows-done").getByTestId(latestId),
+    ).toBeVisible();
+    await expect.poll(() => rowTestIds(rows)).toEqual([olderId, latestId]);
+    await older.client.waitForAgentUpsert(older.agentId, (a) => a.status === "idle", 90_000);
+    await older.client.clearWorkspaceAttention(older.workspaceId);
+    await expect(page.getByTestId("sidebar-status-group-rows-running")).toHaveCount(0);
+    await expect.poll(() => rowTestIds(rows)).toEqual([latestId, olderId]);
+    await openWorkspaceSettings(page);
+    await page.getByTestId("settings-workspaces-workspace-running").getByRole("switch").click();
+    await gotoAppShell(page);
+    await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
+    await expect.poll(() => rowTestIds(rows)).toEqual([latestId, olderId]);
+    await page.reload();
+    await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
+    await expect.poll(() => rowTestIds(rows)).toEqual([latestId, olderId]);
+  } finally {
+    await older.cleanup();
     await latest.cleanup();
   }
 });

@@ -37,7 +37,6 @@ export interface SidebarStatusWorkspacePlacement extends SidebarWorkspacePlaceme
 }
 
 export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
-  activityAt?: Date | null;
   lastStartedAt?: Date | null;
   hasRunningAgent?: boolean;
   workspaceDirectory: string;
@@ -176,10 +175,6 @@ export function createSidebarWorkspaceEntry(input: {
     currentBranch: normalizeCurrentBranch(input.workspace.gitRuntime?.currentBranch),
     statusBucket: effectiveStatus.status,
     statusEnteredAt: effectiveStatus.enteredAt,
-    activityAt: latestWorkspaceActivity(
-      input.workspace.activityAt,
-      input.workspaceAgentActivity?.get(input.workspace.id)?.activityAt,
-    ),
     lastStartedAt: input.workspaceAgentActivity?.get(input.workspace.id)?.lastStartedAt ?? null,
     hasRunningAgent:
       input.workspaceAgentActivity?.get(input.workspace.id)?.hasRunningAgent ?? false,
@@ -197,15 +192,6 @@ export function createSidebarWorkspaceEntry(input: {
 }
 
 const EMPTY_WORKSPACE_LABELS: string[] = [];
-
-function latestWorkspaceActivity(
-  descriptor: Date | null | undefined,
-  chat: Date | undefined,
-): Date | null {
-  if (!descriptor) return chat ?? null;
-  if (!chat) return descriptor;
-  return chat > descriptor ? chat : descriptor;
-}
 
 function deriveEffectiveWorkspaceStatus(input: {
   serverId: string;
@@ -504,14 +490,7 @@ export function shouldShowSidebarHostLabels(projects: SidebarProjectEntry[]): bo
 const nameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
 type SortMode = import("@/stores/sidebar-view-store").SidebarSortMode;
-type ActivityEntry = Pick<
-  SidebarWorkspaceEntry,
-  "lastStartedAt" | "hasRunningAgent" | "activityAt"
->;
-
-function sidebarStartedAt(entry: ActivityEntry): Date | null | undefined {
-  return entry.lastStartedAt === undefined ? entry.activityAt : entry.lastStartedAt;
-}
+type ActivityEntry = Pick<SidebarWorkspaceEntry, "lastStartedAt" | "hasRunningAgent">;
 
 export function compareSidebarActivity(
   left: ActivityEntry,
@@ -520,7 +499,7 @@ export function compareSidebarActivity(
 ): number {
   if (runningFirst && Boolean(left.hasRunningAgent) !== Boolean(right.hasRunningAgent))
     return left.hasRunningAgent ? -1 : 1;
-  return (sidebarStartedAt(right)?.getTime() ?? 0) - (sidebarStartedAt(left)?.getTime() ?? 0);
+  return (right.lastStartedAt?.getTime() ?? 0) - (left.lastStartedAt?.getTime() ?? 0);
 }
 
 export function compareSidebarNames(left: string, right: string): number {
@@ -528,7 +507,7 @@ export function compareSidebarNames(left: string, right: string): number {
 }
 
 export function sortSidebarProjects(
-  projects: readonly SidebarProjectEntry[],
+  projects: SidebarProjectEntry[],
   entries: ReadonlyMap<string, SidebarWorkspaceEntry>,
   levels: {
     workspaces: SortMode;
@@ -537,32 +516,39 @@ export function sortSidebarProjects(
     projectRunningFirst?: boolean;
   },
 ): SidebarProjectEntry[] {
+  if (levels.workspaces === "manual" && levels.projects === "manual") return projects;
   const projectActivity = new Map<string, ActivityEntry>();
   const sorted = projects.map((project) => {
-    const workspaces = [...project.workspaces];
-    workspaces.sort((left, right) => {
-      if (levels.workspaces === "name")
-        return compareSidebarNames(
-          entries.get(left.workspaceKey)?.name ?? left.name,
-          entries.get(right.workspaceKey)?.name ?? right.name,
-        );
-      if (levels.workspaces === "recent")
-        return compareSidebarActivity(
-          entries.get(left.workspaceKey) ?? {},
-          entries.get(right.workspaceKey) ?? {},
-          levels.workspaceRunningFirst,
-        );
-      return 0;
-    });
-    let lastStartedAt: Date | null = null;
-    let hasRunningAgent = false;
-    for (const workspace of workspaces) {
-      const entry = entries.get(workspace.workspaceKey);
-      const startedAt = entry ? sidebarStartedAt(entry) : null;
-      if (startedAt && (!lastStartedAt || startedAt > lastStartedAt)) lastStartedAt = startedAt;
-      hasRunningAgent ||= entry?.hasRunningAgent ?? false;
+    const workspaces =
+      levels.workspaces === "manual" ? project.workspaces : [...project.workspaces];
+    if (levels.workspaces !== "manual")
+      workspaces.sort((left, right) => {
+        if (levels.workspaces === "name")
+          return compareSidebarNames(
+            entries.get(left.workspaceKey)?.name ?? left.name,
+            entries.get(right.workspaceKey)?.name ?? right.name,
+          );
+        if (levels.workspaces === "recent")
+          return compareSidebarActivity(
+            entries.get(left.workspaceKey) ?? {},
+            entries.get(right.workspaceKey) ?? {},
+            levels.workspaceRunningFirst,
+          );
+        return 0;
+      });
+    if (levels.projects === "recent") {
+      let lastStartedAt: Date | null = null;
+      let hasRunningAgent = false;
+      for (const workspace of workspaces) {
+        const entry = entries.get(workspace.workspaceKey);
+        const startedAt = entry?.lastStartedAt;
+        if (startedAt && (!lastStartedAt || startedAt > lastStartedAt)) lastStartedAt = startedAt;
+        hasRunningAgent ||= entry?.hasRunningAgent ?? false;
+      }
+      projectActivity.set(project.viewKey, { lastStartedAt, hasRunningAgent });
     }
-    projectActivity.set(project.viewKey, { lastStartedAt, hasRunningAgent });
+    if (workspaces.every((workspace, index) => workspace === project.workspaces[index]))
+      return project;
     return { ...project, workspaces };
   });
   sorted.sort((left, right) => {

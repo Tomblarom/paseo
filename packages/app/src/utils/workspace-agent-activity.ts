@@ -6,7 +6,6 @@ export interface WorkspaceAgentActivity {
   agentId: string;
   status: WorkspaceDescriptor["status"];
   enteredAt: Date | null;
-  activityAt?: Date;
   lastStartedAt?: Date | null;
   hasRunningAgent?: boolean;
 }
@@ -22,7 +21,6 @@ export function buildWorkspaceAgentActivityIndex(
 ): Map<string, WorkspaceAgentActivity> {
   const activityByWorkspaceId = new Map<string, WorkspaceAgentActivity>();
   const latestActivityAtByWorkspaceId = new Map<string, Date>();
-  const latestChatActivityByWorkspaceId = new Map<string, Date>();
   const latestStartByWorkspaceId = new Map<string, Date>();
   const runningWorkspaces = new Set<string>();
 
@@ -36,7 +34,6 @@ export function buildWorkspaceAgentActivityIndex(
     // must not advance start-based sorting.
     recordLatestTimestamp(latestStartByWorkspaceId, agent.workspaceId, agent.lastUserMessageAt);
     if (workspaceAgentStatus(agent) === "running") runningWorkspaces.add(agent.workspaceId);
-    recordLatestTimestamp(latestChatActivityByWorkspaceId, agent.workspaceId, agent.lastActivityAt);
 
     const enteredAt = agent.attentionTimestamp ?? agent.updatedAt;
     const latestActivityAt = latestActivityAtByWorkspaceId.get(agent.workspaceId);
@@ -59,7 +56,6 @@ export function buildWorkspaceAgentActivityIndex(
   }
 
   for (const [workspaceId, activity] of activityByWorkspaceId) {
-    activity.activityAt = latestChatActivityByWorkspaceId.get(workspaceId);
     activity.lastStartedAt = latestStartByWorkspaceId.get(workspaceId) ?? null;
     activity.hasRunningAgent = runningWorkspaces.has(workspaceId);
     activityByWorkspaceId.set(
@@ -92,7 +88,6 @@ function preserveWorkspaceStatusEntry(
   if (previous.lastStartedAt?.getTime() === activity.lastStartedAt?.getTime())
     activity.lastStartedAt = previous.lastStartedAt;
   if (
-    previous.activityAt?.getTime() === activity.activityAt?.getTime() &&
     previous.lastStartedAt === activity.lastStartedAt &&
     previous.hasRunningAgent === activity.hasRunningAgent
   )

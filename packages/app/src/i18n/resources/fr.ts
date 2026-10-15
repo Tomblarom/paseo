@@ -1181,6 +1181,7 @@ export const fr: TranslationResources = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "Groupement par projet",
         name: "Nom",
         workspaces: "Trier les espaces par",
         projects: "Trier les projets par",
@@ -2090,6 +2091,8 @@ export const fr: TranslationResources = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint:
+        "Groupez par Projet pour activer le tri des projets par activité. Votre choix est conservé.",
       sorting: "Tri par activité",
       workspaceRunningFirst: "Priorité aux agents actifs dans les espaces",
       projectRunningFirst: "Priorité aux agents actifs dans les projets",

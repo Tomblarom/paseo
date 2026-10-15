@@ -5,6 +5,7 @@ import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 export function WorkspacesSection() {
   const { t } = useTranslation();
   const sortMode = useSidebarViewStore((state) => state.sortMode);
+  const groupMode = useSidebarViewStore((state) => state.groupMode);
   const projectSortMode = useSidebarViewStore((state) => state.projectSortMode);
   const workspaceRunningFirst = useSidebarViewStore((state) => state.workspaceActivityRunningFirst);
   const projectRunningFirst = useSidebarViewStore((state) => state.projectActivityRunningFirst);
@@ -34,10 +35,14 @@ export function WorkspacesSection() {
         />
         <SettingsSwitch
           label={t("settings.workspaces.projectRunningFirst")}
-          hint={hint(projectSortMode, t("sidebar.display.sorting.projects"))}
+          hint={
+            groupMode === "project"
+              ? hint(projectSortMode, t("sidebar.display.sorting.projects"))
+              : t("settings.workspaces.projectGroupingHint")
+          }
           value={projectRunningFirst}
           onValueChange={setProjectRunningFirst}
-          disabled={projectSortMode !== "recent"}
+          disabled={projectSortMode !== "recent" || groupMode !== "project"}
           testID="settings-workspaces-project-running"
         />
       </SettingsCard>

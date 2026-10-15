@@ -1161,6 +1161,7 @@ export const ko: TranslationResources = {
     },
     display: {
       sorting: {
+        projectGroupingOnly: "프로젝트 그룹에서만",
         name: "이름",
         workspaces: "워크스페이스 정렬 기준",
         projects: "프로젝트 정렬 기준",
@@ -2054,6 +2055,8 @@ export const ko: TranslationResources = {
   },
   settings: {
     workspaces: {
+      projectGroupingHint:
+        "프로젝트 활동 정렬을 사용하려면 프로젝트별로 그룹화하세요. 저장된 설정은 유지됩니다.",
       sorting: "활동 정렬",
       workspaceRunningFirst: "워크스페이스의 실행 중 에이전트 우선",
       projectRunningFirst: "프로젝트의 실행 중 에이전트 우선",

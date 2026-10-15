@@ -356,18 +356,23 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
             {t("sidebar.display.grouping.label")}
           </MenuSubTrigger>
           <MenuSubTrigger
+            id="projectSorting"
+            disabled={preferences.grouping !== "project"}
+            value={
+              preferences.grouping === "project"
+                ? t(SORT_LABEL_KEYS[preferences.projectSortMode])
+                : t("sidebar.display.sorting.projectGroupingOnly")
+            }
+            testID="sidebar-display-project-sorting"
+          >
+            {t("sidebar.display.sorting.projects")}
+          </MenuSubTrigger>
+          <MenuSubTrigger
             id="workspaceSorting"
             value={t(SORT_LABEL_KEYS[preferences.sortMode])}
             testID="sidebar-display-workspace-sorting"
           >
             {t("sidebar.display.sorting.workspaces")}
-          </MenuSubTrigger>
-          <MenuSubTrigger
-            id="projectSorting"
-            value={t(SORT_LABEL_KEYS[preferences.projectSortMode])}
-            testID="sidebar-display-project-sorting"
-          >
-            {t("sidebar.display.sorting.projects")}
           </MenuSubTrigger>
           <MenuSubTrigger
             id="titleSource"

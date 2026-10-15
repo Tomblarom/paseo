@@ -1,11 +1,21 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { getServerId } from "../support/helpers/server-id";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
-import { selectSidebarStatusGrouping, openSidebarDisplayPage } from "../support/helpers/sidebar";
+import {
+  selectSidebarStatusGrouping,
+  openSidebarDisplayPage,
+  chooseSidebarSort,
+  expectDisplaySortHoverFollowsPointer,
+} from "../support/helpers/sidebar";
+import {
+  openWorkspaceSettings,
+  expectRunningFirstSetting,
+  setRunningFirst,
+} from "../support/helpers/settings";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
 test("display preferences hover follows the pointer without highlighting the first option", async ({
@@ -15,46 +25,8 @@ test("display preferences hover follows the pointer without highlighting the fir
   try {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
-    const trigger = page.getByTestId("sidebar-display-preferences-menu");
     for (const scope of ["project", "workspace"] as const) {
-      await trigger.click();
-      const root = page.getByTestId("sidebar-display-preferences-content");
-      const first = root.locator('[data-menu-item="true"]').first();
-      const parent = page.getByTestId(`sidebar-display-${scope}-sorting`);
-      for (const row of [
-        page.getByTestId("sidebar-display-grouping"),
-        page.getByTestId("sidebar-display-title-source"),
-        parent,
-      ]) {
-        await row.hover({ position: { x: 24, y: 14 } });
-        await expect(row).toBeFocused();
-        await expect(first).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      }
-      const manual = page.getByTestId(`sidebar-${scope}-sorting-manual`);
-      const name = page.getByTestId(`sidebar-${scope}-sorting-name`);
-      const recent = page.getByTestId(`sidebar-${scope}-sorting-recent`);
-      await name.hover();
-      for (let frame = 0; frame < 2; frame++) {
-        await page.evaluate(() => new Promise<number>((resolve) => requestAnimationFrame(resolve)));
-      }
-      await expect(name).toBeFocused();
-      await expect(manual).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await recent.hover();
-      await expect(recent).toBeFocused();
-      await expect(manual).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await page.keyboard.press("Home");
-      await expect(manual).toBeFocused();
-      await expect(manual).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await page.keyboard.press("ArrowDown");
-      await expect(name).toBeFocused();
-      await expect(name).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await page.keyboard.press("Enter");
-      await expect(root).toHaveCount(0);
-      await expect(trigger).toBeFocused();
-      await trigger.click();
-      await expect(parent).toContainText("Name");
-      await page.keyboard.press("Escape");
-      await expect(trigger).toBeFocused();
+      await expectDisplaySortHoverFollowsPointer(page, scope);
     }
   } finally {
     await seeded.cleanup();
@@ -78,8 +50,8 @@ test("recent-activity sorting follows chat activity, preserves pins, and survive
     const olderId = `sidebar-workspace-row-${getServerId()}:${older.workspaceId}`;
     const newerId = `sidebar-workspace-row-${getServerId()}:${newer.workspaceId}`;
     const rows = page.locator(`[data-testid="${olderId}"], [data-testid="${newerId}"]`);
-    await chooseSort(page, "workspace", "recent");
-    await chooseSort(page, "project", "recent");
+    await chooseSidebarSort(page, "workspace", "recent");
+    await chooseSidebarSort(page, "project", "recent");
     await expect.poll(() => rowTestIds(rows)).toEqual([newerId, olderId]);
 
     await older.client.sendAgentMessage(older.agentId, "Reply with hello.");
@@ -118,50 +90,52 @@ test("name sorting blocks dragging and running-first settings depend on each sor
     const projectRows = page.locator(
       `[data-testid="${firstProjectId}"], [data-testid="${otherProjectId}"]`,
     );
-    await chooseSort(page, "workspace", "name");
-    await chooseSort(page, "project", "name");
+    await chooseSidebarSort(page, "workspace", "name");
+    await chooseSidebarSort(page, "project", "name");
     await expect.poll(() => rowTestIds(workspaceRows)).toEqual([siblingId, firstId]);
     await expect.poll(() => rowTestIds(projectRows)).toEqual([otherProjectId, firstProjectId]);
     await attemptBlockedDrag(workspaceRows);
     await attemptBlockedDrag(projectRows);
     await openWorkspaceSettings(page);
-    const workspaceSetting = page.getByTestId("settings-workspaces-workspace-running");
-    const projectSetting = page.getByTestId("settings-workspaces-project-running");
-    await expect(workspaceSetting.getByRole("switch")).toBeDisabled();
-    await expect(projectSetting.getByRole("switch")).toBeDisabled();
-    await expect(workspaceSetting).toContainText("Current sorting: Name");
-    await expect(projectSetting).toContainText("Current sorting: Name");
+    await expectRunningFirstSetting(page, "workspace", {
+      enabled: false,
+      statusText: "Current sorting: Name",
+    });
+    await expectRunningFirstSetting(page, "project", {
+      enabled: false,
+      statusText: "Current sorting: Name",
+    });
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
-    await chooseSort(page, "workspace", "recent");
+    await chooseSidebarSort(page, "workspace", "recent");
     await openWorkspaceSettings(page);
-    await expect(workspaceSetting.getByRole("switch")).toBeEnabled();
-    await expect(projectSetting.getByRole("switch")).toBeDisabled();
-    await workspaceSetting.getByRole("switch").click();
+    await expectRunningFirstSetting(page, "workspace", { enabled: true });
+    await expectRunningFirstSetting(page, "project", { enabled: false });
+    await setRunningFirst(page, "workspace", true);
     await page.reload();
-    await expect(workspaceSetting.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+    await expectRunningFirstSetting(page, "workspace", { checked: true });
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
-    await chooseSort(page, "project", "recent");
+    await chooseSidebarSort(page, "project", "recent");
     await openWorkspaceSettings(page);
-    await expect(projectSetting.getByRole("switch")).toBeEnabled();
-    await expect(projectSetting.getByRole("switch")).toHaveAttribute("aria-checked", "false");
-    await projectSetting.getByRole("switch").click();
+    await expectRunningFirstSetting(page, "project", { enabled: true, checked: false });
+    await setRunningFirst(page, "project", true);
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await quickDragFirstRowAfterSecond(projectRows, pressProjectRow);
     await openWorkspaceSettings(page);
-    await expect(projectSetting.getByRole("switch")).toBeDisabled();
-    await expect(projectSetting).toContainText("Current sorting: Manual");
-    await expect(workspaceSetting.getByRole("switch")).toBeEnabled();
+    await expectRunningFirstSetting(page, "project", {
+      enabled: false,
+      statusText: "Current sorting: Manual",
+    });
+    await expectRunningFirstSetting(page, "workspace", { enabled: true });
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
-    await chooseSort(page, "project", "recent");
+    await chooseSidebarSort(page, "project", "recent");
     await quickDragFirstRowAfterSecond(workspaceRows, pressWorkspaceRow);
     await openWorkspaceSettings(page);
-    await expect(workspaceSetting.getByRole("switch")).toBeDisabled();
-    await expect(projectSetting.getByRole("switch")).toBeEnabled();
-    await expect(workspaceSetting.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+    await expectRunningFirstSetting(page, "workspace", { enabled: false, checked: true });
+    await expectRunningFirstSetting(page, "project", { enabled: true });
   } finally {
     await first.cleanup();
     await other.cleanup();
@@ -183,10 +157,10 @@ test("running-first drops finished agents while start-based order survives outpu
   try {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
-    await chooseSort(page, "workspace", "recent");
-    await chooseSort(page, "project", "recent");
+    await chooseSidebarSort(page, "workspace", "recent");
+    await chooseSidebarSort(page, "project", "recent");
     await openWorkspaceSettings(page);
-    await page.getByTestId("settings-workspaces-project-running").getByRole("switch").click();
+    await setRunningFirst(page, "project", true);
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     const oldId = `sidebar-workspace-row-${getServerId()}:${running.workspaceId}`;
@@ -207,7 +181,7 @@ test("running-first drops finished agents while start-based order survives outpu
     );
     await expect.poll(() => rowTestIds(rows)).toEqual([oldId, latestId]);
     await openWorkspaceSettings(page);
-    await page.getByTestId("settings-workspaces-project-running").getByRole("switch").click();
+    await setRunningFirst(page, "project", false);
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await expect.poll(() => rowTestIds(rows)).toEqual([latestId, oldId]);
@@ -228,13 +202,13 @@ test("status sorting supports manual drag, hydrated pinned names, collapse, and 
   try {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
-    await chooseSort(page, "project", "recent");
+    await chooseSidebarSort(page, "project", "recent");
     await selectSidebarStatusGrouping(page);
     const firstId = `sidebar-workspace-row-${getServerId()}:${first.workspaceId}`;
     const secondId = `sidebar-workspace-row-${getServerId()}:${second.workspaceId}`;
     const done = page.getByTestId("sidebar-status-group-rows-done");
     const rows = done.locator(`[data-testid="${firstId}"], [data-testid="${secondId}"]`);
-    await chooseSort(page, "workspace", "name");
+    await chooseSidebarSort(page, "workspace", "name");
     await expect.poll(() => rowTestIds(rows)).toEqual([secondId, firstId]);
     await attemptBlockedDrag(rows);
     await page.getByTestId("sidebar-display-preferences-menu").click();
@@ -246,30 +220,29 @@ test("status sorting supports manual drag, hydrated pinned names, collapse, and 
       "Project grouping only",
     );
     await page.keyboard.press("Escape");
-    await chooseSort(page, "workspace", "recent");
+    await chooseSidebarSort(page, "workspace", "recent");
     await quickDragFirstRowAfterSecond(rows, pressWorkspaceRow);
     const manualOrder = await rowTestIds(rows);
     await page.reload();
     await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
     await expect.poll(() => rowTestIds(rows)).toEqual(manualOrder);
     await openWorkspaceSettings(page);
-    await expect(
-      page.getByTestId("settings-workspaces-workspace-running").getByRole("switch"),
-    ).toBeDisabled();
-    const projectSetting = page.getByTestId("settings-workspaces-project-running");
-    await expect(projectSetting.getByRole("switch")).toBeDisabled();
-    await expect(projectSetting).toContainText("Group by Project");
+    await expectRunningFirstSetting(page, "workspace", { enabled: false });
+    await expectRunningFirstSetting(page, "project", {
+      enabled: false,
+      statusText: "Group by Project",
+    });
     await gotoAppShell(page);
     await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
     await first.client.setWorkspacePinned(first.workspaceId, true);
     await second.client.setWorkspacePinned(second.workspaceId, true);
-    await chooseSort(page, "workspace", "name");
+    await chooseSidebarSort(page, "workspace", "name");
     const pinned = page
       .getByTestId("sidebar-pinned-section")
       .locator(`[data-testid="${firstId}"], [data-testid="${secondId}"]`);
     await expect.poll(() => rowTestIds(pinned)).toEqual([secondId, firstId]);
     await attemptBlockedDrag(pinned);
-    await chooseSort(page, "workspace", "recent");
+    await chooseSidebarSort(page, "workspace", "recent");
     await quickDragFirstRowAfterSecond(pinned, pressWorkspaceRow);
     await first.client.setWorkspacePinned(first.workspaceId, false);
     await second.client.setWorkspacePinned(second.workspaceId, false);
@@ -313,9 +286,9 @@ test("status sorting preserves bucket priority and last-start order through comp
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await selectSidebarStatusGrouping(page);
-    await chooseSort(page, "workspace", "recent");
+    await chooseSidebarSort(page, "workspace", "recent");
     await openWorkspaceSettings(page);
-    await page.getByTestId("settings-workspaces-workspace-running").getByRole("switch").click();
+    await setRunningFirst(page, "workspace", true);
     await gotoAppShell(page);
     await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
     await older.client.sendAgentMessage(older.agentId, "Reply with hello.");
@@ -338,7 +311,7 @@ test("status sorting preserves bucket priority and last-start order through comp
     await expect(page.getByTestId("sidebar-status-group-rows-running")).toHaveCount(0);
     await expect.poll(() => rowTestIds(rows)).toEqual([latestId, olderId]);
     await openWorkspaceSettings(page);
-    await page.getByTestId("settings-workspaces-workspace-running").getByRole("switch").click();
+    await setRunningFirst(page, "workspace", false);
     await gotoAppShell(page);
     await page.locator('[data-testid^="sidebar-status-group-"]').first().waitFor();
     await expect.poll(() => rowTestIds(rows)).toEqual([latestId, olderId]);
@@ -350,23 +323,6 @@ test("status sorting preserves bucket priority and last-start order through comp
     await latest.cleanup();
   }
 });
-
-async function chooseSort(
-  page: Page,
-  scope: "workspace" | "project",
-  mode: "manual" | "name" | "recent",
-) {
-  await page.getByTestId("sidebar-display-preferences-menu").click();
-  await page.getByTestId(`sidebar-display-${scope}-sorting`).click();
-  await page.getByTestId(`sidebar-${scope}-sorting-${mode}`).click();
-}
-
-async function openWorkspaceSettings(page: Page) {
-  await page.goto("/settings", { waitUntil: "domcontentloaded" });
-  // App settings appear before the separate host workspace-management section.
-  await page.getByRole("button", { name: "Workspaces", exact: true }).first().click();
-  await page.getByTestId("settings-workspaces-workspace-running").waitFor();
-}
 
 async function attemptBlockedDrag(rows: Locator) {
   const before = await rowTestIds(rows);

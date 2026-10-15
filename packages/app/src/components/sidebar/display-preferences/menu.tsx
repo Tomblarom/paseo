@@ -69,7 +69,7 @@ const ThemedCircle = withUnistyles(Circle);
 
 /** Fits the item's 16pt leading slot with a hair of room, matching the trailing check. */
 const OPTION_ICON_SIZE = 14;
-const MENU_WIDTH = 232;
+const MENU_WIDTH = 320;
 
 /**
  * Unlabelled's stand-in for a color dot: the same circle at the same size, hollow.

@@ -1162,11 +1162,12 @@ export const en = {
     },
     display: {
       sorting: {
-        workspaces: "Workspaces by activity",
-        projects: "Projects by activity",
+        name: "Name",
+        workspaces: "Sort workspaces by",
+        projects: "Sort projects by",
         label: "Sort by",
         recent: "Recent activity",
-        manual: "Manual order",
+        manual: "Manual",
       },
       showBackground: "Show background",
       trigger: "Display preferences",
@@ -2067,6 +2068,15 @@ export const en = {
     },
   },
   settings: {
+    workspaces: {
+      sorting: "Activity sorting",
+      workspaceRunningFirst: "Prioritize running agents in workspaces",
+      projectRunningFirst: "Prioritize running agents in projects",
+      runningFirstHint:
+        "On: items with running agents come first and drop back when they finish. Off: only starting an agent advances its workspace or project.",
+      disabledHint:
+        "Set “{{sortLabel}}” to Recent activity to enable this. Current sorting: {{sortMode}}.",
+    },
     title: "Settings",
     loading: "Loading settings...",
     groups: {
@@ -2087,6 +2097,7 @@ export const en = {
     },
     groupInfo: "About {{title}}",
     sections: {
+      workspaces: "Workspaces",
       general: "General",
       chat: "Chat",
       appearance: "Appearance",

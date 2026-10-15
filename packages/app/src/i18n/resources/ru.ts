@@ -1171,8 +1171,9 @@ export const ru: TranslationResources = {
     },
     display: {
       sorting: {
-        workspaces: "Рабочие области по активности",
-        projects: "Проекты по активности",
+        name: "Имя",
+        workspaces: "Сортировать рабочие области по",
+        projects: "Сортировать проекты по",
         label: "Сортировка",
         recent: "Недавняя активность",
         manual: "Вручную",
@@ -2075,6 +2076,15 @@ export const ru: TranslationResources = {
     },
   },
   settings: {
+    workspaces: {
+      sorting: "Сортировка по активности",
+      workspaceRunningFirst: "Приоритет активных агентов в рабочих областях",
+      projectRunningFirst: "Приоритет активных агентов в проектах",
+      runningFirstHint:
+        "Включено: элементы с работающими агентами выше и опускаются после завершения. Выключено: элемент поднимается только при запуске агента.",
+      disabledHint:
+        "Выберите «Недавняя активность» в «{{sortLabel}}», чтобы включить. Сейчас: {{sortMode}}.",
+    },
     title: "Настройки",
     loading: "Загрузка настроек...",
     groups: {
@@ -2095,6 +2105,7 @@ export const ru: TranslationResources = {
     },
     groupInfo: "О разделе «{{title}}»",
     sections: {
+      workspaces: "Рабочие области",
       general: "Основные",
       chat: "Чат",
       appearance: "Оформление",

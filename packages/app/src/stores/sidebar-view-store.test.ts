@@ -34,12 +34,16 @@ describe("sidebar view store", () => {
     expect(useSidebarViewStore.getInitialState()).toMatchObject({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
     });
     expect(migrateSidebarViewState({}).sortMode).toBe("manual");
     expect(migrateSidebarViewState({ groupMode: "status", hostFilters: ["host-a"] })).toMatchObject(
       {
         sortMode: "manual",
         projectSortMode: "manual",
+        workspaceActivityRunningFirst: false,
+        projectActivityRunningFirst: false,
         groupMode: "status",
         hostFilters: ["host-a"],
       },
@@ -58,13 +62,15 @@ describe("sidebar view store", () => {
         groupModeByServerId: { "host-a": "status" },
         sortMode: "recent",
         projectSortMode: "manual",
+        workspaceActivityRunningFirst: false,
+        projectActivityRunningFirst: false,
       }),
     ).toMatchObject({ groupMode: "status", sortMode: "recent", projectSortMode: "manual" });
   });
 
   it("persists independent project and workspace preferences", () => {
-    for (const sortMode of ["manual", "recent"] as const) {
-      for (const projectSortMode of ["manual", "recent"] as const) {
+    for (const sortMode of ["manual", "name", "recent"] as const) {
+      for (const projectSortMode of ["manual", "name", "recent"] as const) {
         expect(migrateSidebarViewState({ sortMode, projectSortMode })).toMatchObject({
           sortMode,
           projectSortMode,
@@ -76,6 +82,8 @@ describe("sidebar view store", () => {
     expect(useSidebarViewStore.getState()).toMatchObject({
       sortMode: "recent",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
     });
     store.setProjectSortMode("recent");
     store.setSortMode("manual");
@@ -87,6 +95,35 @@ describe("sidebar view store", () => {
     expect(useSidebarViewStore.getState()).toMatchObject({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
+    });
+  });
+
+  it("stores running-first preferences independently and keeps them when sorting changes", () => {
+    const store = useSidebarViewStore.getState();
+    store.setWorkspaceActivityRunningFirst(true);
+    store.setProjectActivityRunningFirst(false);
+    store.setSortMode("name");
+    expect(useSidebarViewStore.getState()).toMatchObject({
+      workspaceActivityRunningFirst: true,
+      projectActivityRunningFirst: false,
+      sortMode: "name",
+    });
+    store.setSortMode("recent");
+    store.setProjectActivityRunningFirst(true);
+    expect(
+      migrateSidebarViewState({
+        sortMode: "recent",
+        projectSortMode: "name",
+        workspaceActivityRunningFirst: false,
+        projectActivityRunningFirst: true,
+      }),
+    ).toMatchObject({
+      sortMode: "recent",
+      projectSortMode: "name",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: true,
     });
   });
 
@@ -103,6 +140,8 @@ describe("sidebar view store", () => {
     useSidebarViewStore.setState({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
       showBackground: false,
       groupMode: "project",
       hostFilters: [],
@@ -158,6 +197,8 @@ describe("sidebar view store", () => {
     ).toEqual({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
       showBackground: false,
       groupMode: "status",
       hostFilters: [],
@@ -175,6 +216,8 @@ describe("sidebar view store", () => {
     ).toEqual({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
       showBackground: false,
       groupMode: "status",
       hostFilters: ["host-a"],
@@ -192,6 +235,8 @@ describe("sidebar view store", () => {
     ).toEqual({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
       showBackground: false,
       groupMode: "status",
       hostFilters: ["host-a", "host-b"],
@@ -305,6 +350,8 @@ describe("sidebar view store", () => {
     ).toEqual({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
       showBackground: false,
       groupMode: "project",
       hostFilters: ["host-a"],
@@ -317,6 +364,8 @@ describe("sidebar view store", () => {
     expect(migrateSidebarViewState({ projectFilters: "project-a" })).toEqual({
       sortMode: "manual",
       projectSortMode: "manual",
+      workspaceActivityRunningFirst: false,
+      projectActivityRunningFirst: false,
       showBackground: false,
       groupMode: "project",
       hostFilters: [],

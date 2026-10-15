@@ -1154,8 +1154,9 @@ export const ar: TranslationResources = {
     },
     display: {
       sorting: {
-        workspaces: "مساحات العمل حسب النشاط",
-        projects: "المشاريع حسب النشاط",
+        name: "الاسم",
+        workspaces: "ترتيب مساحات العمل حسب",
+        projects: "ترتيب المشاريع حسب",
         label: "ترتيب حسب",
         recent: "النشاط الأخير",
         manual: "ترتيب يدوي",
@@ -2042,6 +2043,14 @@ export const ar: TranslationResources = {
     },
   },
   settings: {
+    workspaces: {
+      sorting: "الترتيب حسب النشاط",
+      workspaceRunningFirst: "إعطاء أولوية للوكلاء النشطين في مساحات العمل",
+      projectRunningFirst: "إعطاء أولوية للوكلاء النشطين في المشاريع",
+      runningFirstHint:
+        "عند التفعيل، تظهر العناصر ذات الوكلاء النشطين أولاً وتتراجع بعد انتهائهم. عند التعطيل، يتقدم العنصر فقط عند بدء وكيل.",
+      disabledHint: "اضبط «{{sortLabel}}» على النشاط الأخير للتفعيل. الترتيب الحالي: {{sortMode}}.",
+    },
     title: "إعدادات",
     loading: "جارٍ تحميل الإعدادات...",
     groups: {
@@ -2062,6 +2071,7 @@ export const ar: TranslationResources = {
     },
     groupInfo: "حول{{title}}",
     sections: {
+      workspaces: "مساحات العمل",
       general: "عام",
       chat: "الدردشة",
       appearance: "مظهر",

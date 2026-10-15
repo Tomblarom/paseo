@@ -122,9 +122,16 @@ const TRAILING_ICONS: Record<SidebarTrailingChoice, OptionIcon> = {
 };
 
 const GROUPING_MODES: readonly SidebarGroupMode[] = ["project", "status"];
+const SORT_MODES: readonly SidebarSortMode[] = ["manual", "name", "recent"];
+const SORT_ICONS: Record<SidebarSortMode, OptionIcon> = {
+  manual: withUnistyles(Folder),
+  name: withUnistyles(Type),
+  recent: withUnistyles(Clock),
+};
 const SORT_LABEL_KEYS: Record<SidebarSortMode, string> = {
   recent: "sidebar.display.sorting.recent",
   manual: "sidebar.display.sorting.manual",
+  name: "sidebar.display.sorting.name",
 };
 const TITLE_SOURCES: readonly WorkspaceTitleSource[] = ["title", "branch"];
 const TRAILING_CHOICES: readonly SidebarTrailingChoice[] = ["diff", "timestamp"];
@@ -197,9 +204,32 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
   const pages = useMemo<MenuPageDefinition[]>(() => {
     const definitions: MenuPageDefinition[] = [
       {
-        id: "sorting",
-        title: t("sidebar.display.sorting.label"),
-        content: <SortingPage preferences={preferences} />,
+        id: "workspaceSorting",
+        title: t("sidebar.display.sorting.workspaces"),
+        content: (
+          <OptionList
+            values={SORT_MODES}
+            icons={SORT_ICONS}
+            labelKeys={SORT_LABEL_KEYS}
+            selectedValue={preferences.sortMode}
+            onSelect={preferences.setSortMode}
+            testIDPrefix="sidebar-workspace-sorting"
+          />
+        ),
+      },
+      {
+        id: "projectSorting",
+        title: t("sidebar.display.sorting.projects"),
+        content: (
+          <OptionList
+            values={SORT_MODES}
+            icons={SORT_ICONS}
+            labelKeys={SORT_LABEL_KEYS}
+            selectedValue={preferences.projectSortMode}
+            onSelect={preferences.setProjectSortMode}
+            testIDPrefix="sidebar-project-sorting"
+          />
+        ),
       },
       {
         id: "grouping",
@@ -326,17 +356,18 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
             {t("sidebar.display.grouping.label")}
           </MenuSubTrigger>
           <MenuSubTrigger
-            id="sorting"
-            value={t(
-              SORT_LABEL_KEYS[
-                preferences.sortMode === "recent" || preferences.projectSortMode === "recent"
-                  ? "recent"
-                  : "manual"
-              ],
-            )}
-            testID="sidebar-display-sorting"
+            id="workspaceSorting"
+            value={t(SORT_LABEL_KEYS[preferences.sortMode])}
+            testID="sidebar-display-workspace-sorting"
           >
-            {t("sidebar.display.sorting.label")}
+            {t("sidebar.display.sorting.workspaces")}
+          </MenuSubTrigger>
+          <MenuSubTrigger
+            id="projectSorting"
+            value={t(SORT_LABEL_KEYS[preferences.projectSortMode])}
+            testID="sidebar-display-project-sorting"
+          >
+            {t("sidebar.display.sorting.projects")}
           </MenuSubTrigger>
           <MenuSubTrigger
             id="titleSource"
@@ -567,36 +598,6 @@ function OptionList<Value extends string>({
       testID={`${testIDPrefix}-${value}`}
     />
   ));
-}
-
-function SortingPage({ preferences }: { preferences: Preferences }): ReactElement {
-  const { t } = useTranslation();
-  const toggleWorkspaces = useCallback(() => {
-    preferences.setSortMode(preferences.sortMode === "recent" ? "manual" : "recent");
-  }, [preferences]);
-  const toggleProjects = useCallback(() => {
-    preferences.setProjectSortMode(preferences.projectSortMode === "recent" ? "manual" : "recent");
-  }, [preferences]);
-  return (
-    <>
-      <MenuItem
-        selected={preferences.sortMode === "recent"}
-        closeOnSelect={false}
-        onSelect={toggleWorkspaces}
-        testID="sidebar-sorting-workspaces"
-      >
-        {t("sidebar.display.sorting.workspaces")}
-      </MenuItem>
-      <MenuItem
-        selected={preferences.projectSortMode === "recent"}
-        closeOnSelect={false}
-        onSelect={toggleProjects}
-        testID="sidebar-sorting-projects"
-      >
-        {t("sidebar.display.sorting.projects")}
-      </MenuItem>
-    </>
-  );
 }
 
 /**

@@ -1,3 +1,4 @@
+import { compareSidebarNames } from "@/hooks/sidebar-workspaces-view-model";
 import type { TFunction } from "i18next";
 import { buildStatusGroups } from "@/hooks/sidebar-status-view-model";
 import {
@@ -44,6 +45,7 @@ export interface SidebarProjectionInput {
   projectNamesByViewKey: Map<string, string>;
   groupMode: SidebarGroupMode;
   sortMode?: SidebarSortMode;
+  workspaceActivityRunningFirst?: boolean;
   pinnedCollapsed: boolean;
   collapsedProjectKeys: ReadonlySet<string>;
   collapsedWorkspaceGroupKeys: ReadonlySet<string>;
@@ -56,6 +58,8 @@ export function buildSidebarProjection(input: SidebarProjectionInput): SidebarPr
     keys: input.pinnedKeys,
     pinnedWorkspaceOrder: input.pinnedWorkspaceOrder,
   });
+  if (input.sortMode === "name")
+    pinnedGroups.pinnedChats.sort((left, right) => compareSidebarNames(left.name, right.name));
   const pinnedWorkspaceKeys = new Set(input.pinnedKeys.pinnedWorkspaceKeys);
   const unpinnedWorkspaces = Array.from(input.workspaceEntriesByKey.values()).filter(
     (workspace) => !pinnedWorkspaceKeys.has(workspace.workspaceKey),
@@ -107,7 +111,8 @@ function buildWorkspaceGroups(
           unpinnedWorkspaces,
           input.projectNamesByViewKey,
           input.t,
-          input.sortMode === "recent",
+          input.sortMode,
+          input.workspaceActivityRunningFirst,
         ),
       );
   }

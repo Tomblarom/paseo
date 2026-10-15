@@ -1,3 +1,4 @@
+import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import {
   memo,
   useCallback,
@@ -146,6 +147,7 @@ export function SidebarStatusWorkspaceList({
   parentGestureRef,
   dragGestureHostActive,
 }: StatusWorkspaceListProps) {
+  const workspaceDragEnabled = useSidebarViewStore((state) => state.sortMode !== "name");
   const collapsedWorkspaceGroupKeys = useSidebarCollapsedSectionsStore(
     (state) => state.collapsedWorkspaceGroupKeys,
   );
@@ -207,6 +209,7 @@ export function SidebarStatusWorkspaceList({
             <>
               <DraggableList
                 testID="sidebar-pinned-list"
+                dragEnabled={workspaceDragEnabled}
                 data={visiblePinnedWorkspaces}
                 keyExtractor={statusWorkspaceKeyExtractor}
                 renderItem={renderPinnedWorkspace}

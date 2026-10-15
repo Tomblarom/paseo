@@ -15,10 +15,7 @@ import {
   type SidebarGroupMode,
 } from "@/stores/sidebar-view-store";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
-import {
-  applyStoredOrdering,
-  sortSidebarProjectsByActivity,
-} from "@/hooks/sidebar-workspaces-view-model";
+import { applyStoredOrdering, sortSidebarProjects } from "@/hooks/sidebar-workspaces-view-model";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 import { buildSidebarProjection } from "./sidebar-projection";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
@@ -64,6 +61,12 @@ export function SidebarModelProvider({
   const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarViewStore((state) => state.groupMode);
   const sortMode = useSidebarViewStore((state) => state.sortMode);
+  const workspaceActivityRunningFirst = useSidebarViewStore(
+    (state) => state.workspaceActivityRunningFirst,
+  );
+  const projectActivityRunningFirst = useSidebarViewStore(
+    (state) => state.projectActivityRunningFirst,
+  );
   const projectSortMode = useSidebarViewStore((state) => state.projectSortMode);
   const projectOrder = useSidebarOrderStore((state) => state.projectOrder);
   const workspaceOrderByProject = useSidebarOrderStore((state) => state.workspaceOrderByProject);
@@ -159,9 +162,11 @@ export function SidebarModelProvider({
         }),
       }),
     );
-    return sortSidebarProjectsByActivity(orderedProjects, filteredWorkspaceEntriesByKey, {
-      workspaces: sortMode === "recent",
-      projects: projectSortMode === "recent",
+    return sortSidebarProjects(orderedProjects, filteredWorkspaceEntriesByKey, {
+      workspaces: sortMode,
+      projects: projectSortMode,
+      workspaceRunningFirst: workspaceActivityRunningFirst,
+      projectRunningFirst: projectActivityRunningFirst,
     });
   }, [
     showBackground,
@@ -172,6 +177,8 @@ export function SidebarModelProvider({
     visibleWorkspaceKeys,
     sortMode,
     projectSortMode,
+    workspaceActivityRunningFirst,
+    projectActivityRunningFirst,
     projectOrder,
     workspaceOrderByProject,
     filteredWorkspaceEntriesByKey,
@@ -186,6 +193,7 @@ export function SidebarModelProvider({
       projectNamesByViewKey: list.projectNamesByViewKey,
       groupMode,
       sortMode,
+      workspaceActivityRunningFirst,
       pinnedCollapsed,
       collapsedProjectKeys,
       collapsedWorkspaceGroupKeys,
@@ -196,6 +204,7 @@ export function SidebarModelProvider({
       collapsedWorkspaceGroupKeys,
       groupMode,
       sortMode,
+      workspaceActivityRunningFirst,
       list.projectNamesByViewKey,
       filteredProjects,
       pinnedCollapsed,

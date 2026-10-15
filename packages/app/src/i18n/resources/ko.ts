@@ -1161,8 +1161,9 @@ export const ko: TranslationResources = {
     },
     display: {
       sorting: {
-        workspaces: "활동순 워크스페이스",
-        projects: "활동순 프로젝트",
+        name: "이름",
+        workspaces: "워크스페이스 정렬 기준",
+        projects: "프로젝트 정렬 기준",
         label: "정렬 기준",
         recent: "최근 활동",
         manual: "수동 순서",
@@ -2052,6 +2053,15 @@ export const ko: TranslationResources = {
     },
   },
   settings: {
+    workspaces: {
+      sorting: "활동 정렬",
+      workspaceRunningFirst: "워크스페이스의 실행 중 에이전트 우선",
+      projectRunningFirst: "프로젝트의 실행 중 에이전트 우선",
+      runningFirstHint:
+        "켜짐: 실행 중 에이전트가 있는 항목이 먼저 표시되고 종료 후 내려갑니다. 꺼짐: 에이전트 시작 시에만 항목이 올라갑니다.",
+      disabledHint:
+        "활성화하려면 “{{sortLabel}}”에서 최근 활동을 선택하세요. 현재 정렬: {{sortMode}}.",
+    },
     title: "설정",
     loading: "설정 불러오는 중...",
     groups: {
@@ -2072,6 +2082,7 @@ export const ko: TranslationResources = {
     },
     groupInfo: "{{title}} 정보",
     sections: {
+      workspaces: "워크스페이스",
       general: "일반",
       chat: "채팅",
       appearance: "모양",

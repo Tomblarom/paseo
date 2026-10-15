@@ -60,7 +60,7 @@ describe("buildStatusGroups", () => {
       }),
     ];
     expect(
-      buildStatusGroups(workspaces, emptyProjectNames, i18n.t, true)[0].rows.map(
+      buildStatusGroups(workspaces, emptyProjectNames, i18n.t, "recent")[0].rows.map(
         (row) => row.workspaceKey,
       ),
     ).toEqual(["srv:second", "srv:first"]);
@@ -69,6 +69,18 @@ describe("buildStatusGroups", () => {
         (row) => row.workspaceKey,
       ),
     ).toEqual(["srv:first", "srv:second"]);
+  });
+  it("preserves default status ordering for manual and sorts names inside fixed buckets", () => {
+    const rows = [
+      ws({ workspaceKey: "srv:z", name: "Workspace 10", statusEnteredAt: new Date(10) }),
+      ws({ workspaceKey: "srv:a", name: "Workspace 2", statusEnteredAt: new Date(20) }),
+    ];
+    expect(
+      buildStatusGroups(rows, emptyProjectNames, i18n.t, "manual")[0].rows.map((w) => w.name),
+    ).toEqual(["Workspace 2", "Workspace 10"]);
+    expect(
+      buildStatusGroups(rows, emptyProjectNames, i18n.t, "name")[0].rows.map((w) => w.name),
+    ).toEqual(["Workspace 2", "Workspace 10"]);
   });
   it("groups workspaces by status bucket in fixed order", () => {
     const workspaces = [

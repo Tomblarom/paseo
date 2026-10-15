@@ -8,6 +8,59 @@ import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 import { selectSidebarStatusGrouping, openSidebarDisplayPage } from "../support/helpers/sidebar";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
+test("display preferences hover follows the pointer without highlighting the first option", async ({
+  page,
+}) => {
+  const seeded = await seedWorkspace({ repoPrefix: "sidebar-hover-" });
+  try {
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    const trigger = page.getByTestId("sidebar-display-preferences-menu");
+    for (const scope of ["project", "workspace"] as const) {
+      await trigger.click();
+      const root = page.getByTestId("sidebar-display-preferences-content");
+      const first = root.locator('[data-menu-item="true"]').first();
+      const parent = page.getByTestId(`sidebar-display-${scope}-sorting`);
+      for (const row of [
+        page.getByTestId("sidebar-display-grouping"),
+        page.getByTestId("sidebar-display-title-source"),
+        parent,
+      ]) {
+        await row.hover({ position: { x: 24, y: 14 } });
+        await expect(row).toBeFocused();
+        await expect(first).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      }
+      const manual = page.getByTestId(`sidebar-${scope}-sorting-manual`);
+      const name = page.getByTestId(`sidebar-${scope}-sorting-name`);
+      const recent = page.getByTestId(`sidebar-${scope}-sorting-recent`);
+      await name.hover();
+      for (let frame = 0; frame < 2; frame++) {
+        await page.evaluate(() => new Promise<number>((resolve) => requestAnimationFrame(resolve)));
+      }
+      await expect(name).toBeFocused();
+      await expect(manual).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await recent.hover();
+      await expect(recent).toBeFocused();
+      await expect(manual).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await page.keyboard.press("Home");
+      await expect(manual).toBeFocused();
+      await expect(manual).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await page.keyboard.press("ArrowDown");
+      await expect(name).toBeFocused();
+      await expect(name).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await page.keyboard.press("Enter");
+      await expect(root).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+      await trigger.click();
+      await expect(parent).toContainText("Name");
+      await page.keyboard.press("Escape");
+      await expect(trigger).toBeFocused();
+    }
+  } finally {
+    await seeded.cleanup();
+  }
+});
+
 test("recent-activity sorting follows chat activity, preserves pins, and survives reload", async ({
   page,
 }) => {

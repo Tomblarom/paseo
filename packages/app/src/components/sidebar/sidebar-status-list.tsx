@@ -147,7 +147,6 @@ export function SidebarStatusWorkspaceList({
   parentGestureRef,
   dragGestureHostActive,
 }: StatusWorkspaceListProps) {
-  const workspaceDragEnabled = useSidebarViewStore((state) => state.sortMode !== "name");
   const collapsedWorkspaceGroupKeys = useSidebarCollapsedSectionsStore(
     (state) => state.collapsedWorkspaceGroupKeys,
   );
@@ -161,6 +160,8 @@ export function SidebarStatusWorkspaceList({
     canToggle: canTogglePinnedWorkspaces,
     toggleExpanded: togglePinnedWorkspacesExpanded,
   } = useLimitedSidebarGroup(pinnedWorkspaces);
+
+  const workspaceDragEnabled = useSidebarViewStore((state) => state.sortMode !== "name");
 
   const statusShortcutIndex = showShortcutBadges
     ? shortcutIndexByWorkspaceKey

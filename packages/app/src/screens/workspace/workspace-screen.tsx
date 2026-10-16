@@ -3377,6 +3377,9 @@ function WorkspaceScreenContent({
     () =>
       isMobile ? (
         <CompactWorkspaceHeader
+          tabs={tabs}
+          activeTabKey={activeTabKey}
+          onSelectTab={handleSelectSwitcherTab}
           isLoading={isWorkspaceHeaderLoading}
           title={workspaceHeaderTitle}
           subtitle={workspaceHeaderSubtitle}

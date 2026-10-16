@@ -6,10 +6,15 @@ import {
   WorkspaceExplorerToggle,
 } from "@/screens/workspace/workspace-explorer-toggle";
 import { WorkspaceHeaderProjectRow } from "@/screens/workspace/workspace-header-project-row";
+import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
+import { WorkspaceTabSwipeArea } from "./tab-swipe";
 
 export { MobileWorkspaceTabSwitcher } from "./tab-switcher";
 
 interface CompactWorkspaceHeaderProps {
+  tabs: WorkspaceTabDescriptor[];
+  activeTabKey: string;
+  onSelectTab: (key: string) => void;
   serverId: string;
   isLoading: boolean;
   title: string;
@@ -24,6 +29,9 @@ interface CompactWorkspaceHeaderProps {
 
 /** The compact header with the workspace's project row and controls. */
 export function CompactWorkspaceHeader({
+  tabs,
+  activeTabKey,
+  onSelectTab,
   isLoading,
   title,
   subtitle,
@@ -60,13 +68,15 @@ export function CompactWorkspaceHeader({
   );
 
   return (
-    <CompactHeader
-      navigation="menu"
-      title={title}
-      titleTestID="workspace-header-title"
-      subtitle={projectRow}
-      loading={isLoading}
-      actions={actions}
-    />
+    <WorkspaceTabSwipeArea tabs={tabs} activeTabKey={activeTabKey} onSelectTab={onSelectTab}>
+      <CompactHeader
+        navigation="menu"
+        title={title}
+        titleTestID="workspace-header-title"
+        subtitle={projectRow}
+        loading={isLoading}
+        actions={actions}
+      />
+    </WorkspaceTabSwipeArea>
   );
 }

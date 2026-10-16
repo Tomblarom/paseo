@@ -2820,6 +2820,56 @@ test("does not evict a Codex backend when a turn starts during the background-wo
   }
 });
 
+test("does not evict a Codex backend when a provider turn starts during the background-work probe", async () => {
+  vi.useFakeTimers();
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-idle-provider-probe-race-"));
+  class PausedProbeSession extends EvictableTestAgentSession {
+    readonly probeStarted = deferred<void>();
+    readonly probeResult = deferred<boolean>();
+
+    override async canEvictIdleBackend(): Promise<boolean> {
+      this.probeStarted.resolve();
+      return this.probeResult.promise;
+    }
+  }
+  const client = new (class extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      return new PausedProbeSession(config);
+    }
+  })();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    codexIdleBackendTimeoutMs: 10_000,
+    logger,
+  });
+
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    const session = manager.getAgent(agent.id)?.session as PausedProbeSession;
+    await vi.advanceTimersByTimeAsync(10_000);
+    await session.probeStarted.promise;
+
+    // Provider-pushed turn races the probe response: release the probe and enqueue
+    // the event in the same synchronous callback, so the close decision must
+    // observe the queued event before proceeding.
+    session.probeResult.resolve(true);
+    session.pushEvent({ type: "turn_started", provider: "codex", turnId: "provider-turn" });
+    await manager.waitForAgentClose(agent.id);
+    expect(session.closed).toBe(false);
+    expect(manager.getAgent(agent.id)?.lifecycle).toBe("running");
+
+    session.pushEvent({ type: "turn_completed", provider: "codex", turnId: "provider-turn" });
+    await vi.advanceTimersByTimeAsync(0);
+    await manager.closeAgent(agent.id);
+  } finally {
+    manager.prepareForShutdown();
+    vi.useRealTimers();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("explicitly closing a Codex agent still closes it during a skipped idle eviction", async () => {
   vi.useFakeTimers();
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-idle-explicit-close-"));

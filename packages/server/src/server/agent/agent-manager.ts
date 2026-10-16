@@ -1928,6 +1928,9 @@ export class AgentManager {
     await this.drainSessionEvents(agentId);
     if (shouldClose && !shouldClose(agent)) return;
     if (beforeClose && !(await beforeClose(agent))) return;
+    // Session events queue independently of the lifecycle lane; observe anything
+    // that arrived during the probe before the final guard decides.
+    await this.drainSessionEvents(agentId);
     if (shouldClose && !shouldClose(agent)) return;
     onClose?.(agent);
     // Retain ownership until shutdown succeeds. A failed close may still own a

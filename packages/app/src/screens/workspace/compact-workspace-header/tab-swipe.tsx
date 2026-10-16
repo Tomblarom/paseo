@@ -3,10 +3,14 @@ import { View } from "react-native";
 import { Gesture, GestureDetector, PointerType } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { useMobilePanelsRuntime } from "@/mobile-panels/provider";
+import {
+  useMobilePanelOpenGestureExclusion,
+  useMobilePanelsRuntime,
+} from "@/mobile-panels/provider";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 
 interface WorkspaceTabSwipeAreaProps {
+  active: boolean;
   tabs: WorkspaceTabDescriptor[];
   activeTabKey: string;
   onSelectTab: (key: string) => void;
@@ -14,12 +18,14 @@ interface WorkspaceTabSwipeAreaProps {
 }
 
 export function WorkspaceTabSwipeArea({
+  active,
   tabs,
   activeTabKey,
   onSelectTab,
   children,
 }: WorkspaceTabSwipeAreaProps) {
   const { leftOpenGestureRef, rightOpenGestureRef } = useMobilePanelsRuntime();
+  const exclusion = useMobilePanelOpenGestureExclusion(active);
   const startedTabKey = useSharedValue("");
   const singleTouch = useSharedValue(false);
   const selection = useRef({ tabs, activeTabKey, onSelectTab });
@@ -40,7 +46,7 @@ export function WorkspaceTabSwipeArea({
   const gesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(tabs.length > 1)
+        .enabled(active)
         .activeOffsetX([-20, 20])
         .failOffsetY([-12, 12])
         .maxPointers(1)
@@ -68,7 +74,7 @@ export function WorkspaceTabSwipeArea({
         }),
     [
       activeTabKey,
-      tabs.length,
+      active,
       leftOpenGestureRef,
       rightOpenGestureRef,
       selectAdjacentTab,
@@ -79,7 +85,14 @@ export function WorkspaceTabSwipeArea({
 
   return (
     <GestureDetector gesture={gesture} touchAction="pan-y">
-      <View collapsable={false}>{children}</View>
+      <View
+        ref={exclusion.ref}
+        onLayout={exclusion.onLayout}
+        collapsable={false}
+        testID="workspace-tab-swipe-area"
+      >
+        {children}
+      </View>
     </GestureDetector>
   );
 }

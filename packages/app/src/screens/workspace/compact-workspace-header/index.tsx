@@ -12,6 +12,7 @@ import { WorkspaceTabSwipeArea } from "./tab-swipe";
 export { MobileWorkspaceTabSwitcher } from "./tab-switcher";
 
 interface CompactWorkspaceHeaderProps {
+  active: boolean;
   tabs: WorkspaceTabDescriptor[];
   activeTabKey: string;
   onSelectTab: (key: string) => void;
@@ -29,6 +30,7 @@ interface CompactWorkspaceHeaderProps {
 
 /** The compact header with the workspace's project row and controls. */
 export function CompactWorkspaceHeader({
+  active,
   tabs,
   activeTabKey,
   onSelectTab,
@@ -68,7 +70,12 @@ export function CompactWorkspaceHeader({
   );
 
   return (
-    <WorkspaceTabSwipeArea tabs={tabs} activeTabKey={activeTabKey} onSelectTab={onSelectTab}>
+    <WorkspaceTabSwipeArea
+      active={active}
+      tabs={tabs}
+      activeTabKey={activeTabKey}
+      onSelectTab={onSelectTab}
+    >
       <CompactHeader
         navigation="menu"
         title={title}

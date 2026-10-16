@@ -164,20 +164,36 @@ test.describe("Compact workspace header swipes", () => {
   async function swipeHeader(
     page: Page,
     deltaX: number,
-    options: {
-      deltaY?: number;
-      cancel?: boolean;
-      secondFinger?: boolean;
-      fromSwitcher?: boolean;
-    } = {},
+    options: TouchSwipeOptions & { fromSwitcher?: boolean } = {},
   ) {
     const title = await page.getByTestId("workspace-header-title").boundingBox();
     if (!title) throw new Error("Workspace header is not visible");
     const trigger = await page.getByTestId("workspace-tab-switcher-trigger").boundingBox();
     if (!trigger) throw new Error("Tab switcher is not visible");
-    const cdp = await page.context().newCDPSession(page);
     const x = options.fromSwitcher ? trigger.x + trigger.width / 2 : 150;
     const y = options.fromSwitcher ? trigger.y + trigger.height / 2 : title.y + title.height / 2;
+    await touchSwipe(page, { x, y }, deltaX, options);
+  }
+
+  interface TouchSwipeOptions {
+    deltaY?: number;
+    cancel?: boolean;
+    secondFinger?: boolean;
+  }
+
+  interface HeaderSwipePoint {
+    x: number;
+    y: number;
+  }
+
+  async function touchSwipe(
+    page: Page,
+    from: HeaderSwipePoint,
+    deltaX: number,
+    options: TouchSwipeOptions = {},
+  ) {
+    const { x, y } = from;
+    const cdp = await page.context().newCDPSession(page);
     try {
       await cdp.send("Input.dispatchTouchEvent", {
         type: "touchStart",
@@ -207,6 +223,51 @@ test.describe("Compact workspace header swipes", () => {
     }
     await settleGesture(page);
     await expect(page.getByRole("button", { name: "Bottom sheet backdrop" })).toHaveCount(0);
+  }
+
+  async function headerSwipePoints(page: Page) {
+    const area = await page.getByTestId("workspace-tab-swipe-area").boundingBox();
+    if (!area) throw new Error("Workspace tab swipe area is not visible");
+    const title = await page.getByTestId("workspace-header-title").boundingBox();
+    if (!title) throw new Error("Workspace header is not visible");
+    const menu = await page.getByTestId("menu-button").boundingBox();
+    if (!menu) throw new Error("Menu button is not visible");
+    const explorer = await page.getByTestId("workspace-explorer-toggle").boundingBox();
+    if (!explorer) throw new Error("Explorer toggle is not visible");
+    const midY = title.y + title.height / 2;
+    const belowY = area.y + area.height + 120;
+    return {
+      title: { x: 150, y: midY },
+      menu: { x: menu.x + menu.width / 2, y: menu.y + menu.height / 2 },
+      explorer: { x: explorer.x + explorer.width / 2, y: explorer.y + explorer.height / 2 },
+      // Top padding strip of the swipe area: above the island row, no controls.
+      gap: { x: MOBILE_VIEWPORT.width / 2, y: area.y + 4 },
+      leftEdge: { x: area.x + 4, y: midY },
+      rightEdge: { x: area.x + area.width - 4, y: midY },
+      belowLeft: { x: 10, y: belowY },
+      belowRight: { x: MOBILE_VIEWPORT.width - 10, y: belowY },
+      belowCenter: { x: MOBILE_VIEWPORT.width / 2, y: belowY },
+      belowInnerLeft: { x: 60, y: belowY },
+      belowInnerRight: { x: MOBILE_VIEWPORT.width - 60, y: belowY },
+    };
+  }
+
+  async function expectPanelsClosed(page: Page) {
+    await expect(page.getByTestId("agent-list-backdrop")).toHaveCount(0);
+    await expect(page.getByTestId("file-explorer-backdrop")).toHaveCount(0);
+  }
+
+  async function closePanels(page: Page, which: "agent-list" | "file-explorer") {
+    // The open panel covers the header, so closing uses the overlay's own close
+    // control — never a covered workspace button.
+    const closeButton = page.getByTestId(
+      which === "agent-list" ? "sidebar-close" : "explorer-close",
+    );
+    const backdrop = page.getByTestId(`${which}-backdrop`);
+    await expect(backdrop).toBeVisible();
+    await expect(closeButton).toBeVisible();
+    await closeButton.tap();
+    await expect(backdrop).toHaveCount(0);
   }
 
   test("swipes between open tabs in switcher order", async ({ page }, testInfo) => {
@@ -293,6 +354,118 @@ test.describe("Compact workspace header swipes", () => {
       await expect(page.getByRole("button", { name: "New agent", exact: true })).toBeVisible();
       await page.getByText("New Agent", { exact: true }).click();
       await expect(composer).toHaveValue("Second tab draft");
+    } finally {
+      await session.cleanup();
+    }
+  });
+
+  test("header row owns horizontal swipes and no-op gestures never open panels", async ({
+    page,
+  }) => {
+    const session = await seedMockAgentWorkspace({
+      repoPrefix: "compact-header-ownership-",
+      title: "Header ownership chat",
+    });
+    try {
+      await openAgentRoute(page, session);
+      const composer = page
+        .getByRole("textbox", { name: "Message agent..." })
+        .filter({ visible: true });
+      await composer.fill("One tab draft");
+      await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveText("1");
+
+      const points = await headerSwipePoints(page);
+      const starts: Array<[HeaderSwipePoint, number]> = [
+        [points.title, -140],
+        [points.menu, 140],
+        [points.explorer, -140],
+        [points.gap, -140],
+        // Edge swipes travel inward so every touch point stays in the viewport.
+        [points.leftEdge, 140],
+        [points.rightEdge, -140],
+      ];
+      for (const [from, deltaX] of starts) {
+        await touchSwipe(page, from, deltaX);
+        await expect(composer).toHaveValue("One tab draft");
+        await expectPanelsClosed(page);
+      }
+
+      await createTabFromSwitcher(page, "New agent");
+      await composer.fill("Second tab draft");
+      await touchSwipe(page, points.menu, 140);
+      await expect(composer).toHaveValue("One tab draft");
+      await expectPanelsClosed(page);
+      await touchSwipe(page, points.explorer, -140);
+      await expect(composer).toHaveValue("Second tab draft");
+      await expectPanelsClosed(page);
+
+      // Gaps and extreme edges switch tabs exactly like the title does.
+      await touchSwipe(page, points.leftEdge, 140);
+      await expect(composer).toHaveValue("One tab draft");
+      await expectPanelsClosed(page);
+      await touchSwipe(page, points.rightEdge, -140);
+      await expect(composer).toHaveValue("Second tab draft");
+      await expectPanelsClosed(page);
+      await touchSwipe(page, points.gap, 140);
+      await expect(composer).toHaveValue("One tab draft");
+      await expectPanelsClosed(page);
+      await touchSwipe(page, points.gap, -140);
+      await expect(composer).toHaveValue("Second tab draft");
+      await expectPanelsClosed(page);
+
+      // Boundary no-ops stay silent; edge swipes still travel inward.
+      await touchSwipe(page, points.title, -140);
+      await expect(composer).toHaveValue("Second tab draft");
+      await touchSwipe(page, points.rightEdge, -140);
+      await expect(composer).toHaveValue("Second tab draft");
+      await touchSwipe(page, points.title, 140);
+      await expect(composer).toHaveValue("One tab draft");
+      await touchSwipe(page, points.leftEdge, 140);
+      await expect(composer).toHaveValue("One tab draft");
+      await expectPanelsClosed(page);
+
+      // Toggle proof: taps open their panels, so no swipe left one behind. A swipe
+      // that had spuriously opened a panel would invert the toggle and fail here.
+      await page.getByTestId("menu-button").tap();
+      await closePanels(page, "agent-list");
+      await page.getByTestId("workspace-explorer-toggle").tap();
+      await closePanels(page, "file-explorer");
+    } finally {
+      await session.cleanup();
+    }
+  });
+
+  test("panel swipes only start below the header within the 32px edges", async ({ page }) => {
+    const session = await seedMockAgentWorkspace({
+      repoPrefix: "compact-panel-edges-",
+      title: "Panel edge chat",
+    });
+    try {
+      await openAgentRoute(page, session);
+      const composer = page
+        .getByRole("textbox", { name: "Message agent..." })
+        .filter({ visible: true });
+      await composer.fill("Edge draft");
+
+      const points = await headerSwipePoints(page);
+      await touchSwipe(page, points.belowLeft, 150);
+      await closePanels(page, "agent-list");
+
+      await touchSwipe(page, points.belowRight, -150);
+      await closePanels(page, "file-explorer");
+
+      await touchSwipe(page, points.belowCenter, 150);
+      await expect(composer).toHaveValue("Edge draft");
+      await touchSwipe(page, points.belowCenter, -150);
+      await expect(composer).toHaveValue("Edge draft");
+      await touchSwipe(page, points.belowInnerLeft, 150);
+      await touchSwipe(page, points.belowInnerRight, -150);
+      await expect(composer).toHaveValue("Edge draft");
+      await expectPanelsClosed(page);
+
+      // Toggle proof: nothing above opened a panel behind our back.
+      await page.getByTestId("menu-button").tap();
+      await closePanels(page, "agent-list");
     } finally {
       await session.cleanup();
     }

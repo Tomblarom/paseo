@@ -518,6 +518,10 @@ function resolveBrowserToolsEnabled(persisted: ReturnType<typeof loadPersistedCo
   return persisted.daemon?.browserTools?.enabled ?? false;
 }
 
+function resolveUploadsConfig(persisted: PersistedConfig): PaseoDaemonConfig["uploads"] {
+  return { maxFileBytes: persisted.daemon?.uploads?.maxFileBytes ?? null };
+}
+
 /**
  * Both profile lists stay `undefined` when absent rather than defaulting to an
  * empty array: for terminal profiles that is what selects the built-in
@@ -611,7 +615,7 @@ export function resolveConfigFromPersisted(
     listen,
     paseoHome,
     desktopManaged: env.PASEO_DESKTOP_MANAGED === "1",
-    uploads: { maxFileBytes: persisted.daemon?.uploads?.maxFileBytes ?? null },
+    uploads: resolveUploadsConfig(persisted),
     worktreesRoot: resolveWorktreesRoot(paseoHome, persisted),
     corsAllowedOrigins: resolveCorsAllowedOrigins(env, persisted),
     hostnames,

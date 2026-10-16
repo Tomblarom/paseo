@@ -1,12 +1,27 @@
-Format
-======
-> paseo@0.11.2 format
-> oxfmt .
+Source: 5f6544b7045d53716f4164b36b9f51375cd125cb
 
-Finished in 4761ms on 5035 files using 4 threads.
+Repository checks
+=================
+> paseo@0.11.2 format:check:files
+> oxfmt --check docs/mobile-panels.md packages/app/e2e/browser/workspace-tab-switcher-rename.spec.ts packages/app/src/agent-stream/strategy-web.tsx packages/app/src/mobile-panels/gesture-intent.test.ts packages/app/src/mobile-panels/gesture-intent.ts packages/app/src/mobile-panels/gestures.ts packages/app/src/mobile-panels/provider.tsx packages/app/src/screens/workspace/compact-workspace-header/index.tsx packages/app/src/screens/workspace/compact-workspace-header/tab-swipe.tsx packages/app/src/screens/workspace/workspace-screen.tsx
 
-Typecheck
-=========
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 461ms on 10 files using 4 threads.
+
+┃  lint ❯ 
+
+
+> paseo@0.11.2 lint
+> oxlint packages/app/e2e/browser/workspace-tab-switcher-rename.spec.ts packages/app/src/agent-stream/strategy-web.tsx packages/app/src/mobile-panels/gesture-intent.test.ts packages/app/src/mobile-panels/gesture-intent.ts packages/app/src/mobile-panels/gestures.ts packages/app/src/mobile-panels/provider.tsx packages/app/src/screens/workspace/compact-workspace-header/index.tsx packages/app/src/screens/workspace/compact-workspace-header/tab-swipe.tsx packages/app/src/screens/workspace/workspace-screen.tsx
+
+Found 0 warnings and 0 errors.
+Finished in 1.1s on 9 files with 177 rules using 4 threads.
+
+┃  typecheck ❯ 
+
+
 > paseo@0.11.2 typecheck
 > npm run typecheck --workspaces --if-present
 
@@ -67,25 +82,33 @@ generated src/generated/validation/ws-outbound.aot.ts from codegen/ws-outbound.c
 > @getpaseo/cli@0.11.2 typecheck
 > tsgo --noEmit
 
-Lint
-====
-> paseo@0.11.2 lint
-> oxlint
 
-Found 0 warnings and 0 errors.
-Finished in 2.1s on 4699 files with 177 rules using 4 threads.
+                                      
+  ────────────────────────────────────
+summary: (done in 52.66 seconds)      
+✓ format (0.87 seconds)
+✓ lint (1.42 seconds)
+✓ typecheck (52.63 seconds)
 
-Browser touch tests
-===================
-> @getpaseo/app@0.11.2 test:e2e
-> playwright test --project=browser e2e/browser/workspace-tab-switcher-rename.spec.ts
+Targeted policy unit tests
+==========================
+npx vitest run packages/app/src/mobile-panels/gesture-intent.test.ts --bail=1
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
 
+Browser tests
+=============
+env -u PASEO_PASSWORD E2E_RECORD_VIDEO=1 GOMAXPROCS=2 npm run test:e2e --workspace=@getpaseo/app -- e2e/browser/workspace-tab-switcher-rename.spec.ts
+  ✓  1 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:47:7 › Workspace session rename (compact tab switcher) › renames an agent session from the switcher's per-session actions sheet (1.7m)
+  ✓  2 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:110:5 › switcher footer creates tabs and returns to the existing chat (20.2s)
+  ✓  3 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:273:7 › Compact workspace header swipes › swipes between open tabs in switcher order (17.7s)
+  ✘  4 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:310:7 › Compact workspace header swipes › ignores incomplete gestures, multiple fingers and mouse drags while preserving taps (2.0m)
+  ✓  5 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:362:7 › Compact workspace header swipes › header row owns horizontal swipes and no-op gestures never open panels (21.4s)
+  ✓  6 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:438:7 › Compact workspace header swipes › panel swipes only start below the header within the 32px edges (15.0s)
+  1 failed
+  5 passed (5.8m)
 
-Running 4 tests using 1 worker
-
-  ✓  1 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:47:7 › Workspace session rename (compact tab switcher) › renames an agent session from the switcher's per-session actions sheet (14.0s)
-  ✓  2 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:110:5 › switcher footer creates tabs and returns to the existing chat (17.9s)
-  ✓  3 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:212:7 › Compact workspace header swipes › swipes between open tabs in switcher order (16.0s)
-  ✓  4 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:249:7 › Compact workspace header swipes › ignores incomplete gestures, multiple fingers and mouse drags while preserving taps (15.5s)
-
-  4 passed (1.7m)
+The guard case hit its 120-second total timeout at the last click on a moving row. Isolated repeat, same source:
+env -u PASEO_PASSWORD E2E_RECORD_VIDEO=1 GOMAXPROCS=2 npm run test:e2e --workspace=@getpaseo/app -- e2e/browser/workspace-tab-switcher-rename.spec.ts --grep "ignores incomplete"
+  ✓  1 [browser] › e2e/browser/workspace-tab-switcher-rename.spec.ts:310:7 › Compact workspace header swipes › ignores incomplete gestures, multiple fingers and mouse drags while preserving taps (44.5s)
+  1 passed (1.4m)

@@ -1,17 +1,24 @@
-# Browser-controlled USB/IP investigation
+# Browser USB access and serial forwarding
 
-Status: proposal, checked 2026-10-19. Paseo does not implement this feature.
+Status: full USB/IP feasibility investigation and experimental serial-forwarding
+plugin, checked 2026-10-19. Full USB/IP is unsupported.
 
 The target is to use a USB device connected to the browser user's computer from
 an application on a remote Paseo host, using that host's normal USB driver.
-A browser device picker, a serial byte stream, or flashing firmware in JavaScript
-does not meet that requirement.
+A serial byte stream is a narrower supported experiment: it lets agent tools
+communicate with USB serial devices without a helper on the browser computer.
+It does not create an imported USB device on the remote host.
 
-**An ordinary Chrome/Brave page cannot export arbitrary USB devices.** Plan on a
-native exporter beside the physical device and a virtual host controller on the
-receiving machine. Use the browser as the control surface. An optional plugin
-is the appropriate place to investigate that integration. Installed Isolated
-Web Apps have a separate privileged API path described below.
+The local computer must require only an ordinary browser page: no native helper,
+USB/IP exporter, extension, Electron wrapper, or separately installed privileged
+app. The remote host would still need a USB/IP importer and its normal device
+drivers to make a forwarded device available to native applications.
+
+**An ordinary Chrome/Brave page cannot export arbitrary USB devices under these
+constraints.** Protected USB interfaces are inaccessible to the page. A plugin,
+core settings page, or additional transport cannot grant that access. The result
+is a feasibility limit. The serial plugin below provides a bounded alternative
+for serial consoles and byte-oriented tools.
 
 ## Browser limits
 
@@ -41,10 +48,11 @@ packaged USB redirection app. It still needs a USB/IP translation implementation
 OS-specific device access, a native importer, and compatibility testing. An
 ordinary web page cannot enable it with a Permissions Policy header, and a
 normal PWA install does not turn Paseo into an IWA. No Chrome/Brave cross-platform
-IWA deployment or USB/IP implementation was validated here. Treat this as a
-separate distribution option, not evidence that the existing web app supports it.
+IWA deployment or USB/IP implementation was validated here. An installed IWA is
+outside this investigation's ordinary-browser requirement; it is not evidence
+that the existing web app supports unrestricted access.
 
-## Existing implementations
+## Existing implementations and excluded alternatives
 
 USB/IP calls the machine with the physical device the **server/exporter** and
 the machine running the device driver the **client/importer**. For this workflow,
@@ -56,15 +64,16 @@ defines device listing and import over TCP, followed by USB request submission,
 completion, and unlink messages on the imported device's connection. The
 receiving machine needs a virtual host controller and the relevant device driver.
 
-| Candidate                                                                                                                                                    | Role                                                                       | Assessment                                                                                                                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Linux USB/IP](https://github.com/torvalds/linux/tree/master/tools/usb/usbip)                                                                                | Native exporter and importer (`usbip-host`, `usbipd`, `vhci-hcd`, `usbip`) | Start here for a Linux-to-Linux experiment. Reuse the kernel implementation rather than translating USB requests in TypeScript. Requires suitable kernels, userspace tools, and privileged setup.                                                              |
-| [usbipd-win](https://github.com/dorssel/usbipd-win)                                                                                                          | Windows exporter                                                           | Existing service, CLI, and driver. Its documented non-WSL receiver is a Linux USB/IP client. Sharing requires administrator setup and persists across reboots; disconnect alone must not be treated as revocation. Its installer adds a firewall rule.         |
-| [usbip-win2](https://github.com/vadimgrn/usbip-win2)                                                                                                         | Windows importer                                                           | Separate Windows virtual controller implementation. It does not replace the Windows exporter. Driver installation and device compatibility need independent validation.                                                                                        |
-| [VirtualHere](https://www.virtualhere.com/usb_client_software)                                                                                               | Native USB sharing ecosystem                                               | A possible separately configured backend where its supported platforms are needed. It has its own deployment and licensing terms; do not assume wire compatibility with every USB/IP implementation. Its macOS client explicitly excludes microphones/webcams. |
-| [esptool-js](https://github.com/espressif/esptool-js), [DAP.js](https://github.com/ARMmbed/dapjs), [Tango/ya-webadb](https://github.com/yume-chan/ya-webadb) | Device-specific browser workflows                                          | Useful precedents for browser hardware access. They implement device protocols rather than making arbitrary devices available to remote native drivers.                                                                                                        |
+| Candidate                                                                                                                                                    | Role                                                                       | Assessment                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Linux USB/IP](https://github.com/torvalds/linux/tree/master/tools/usb/usbip)                                                                                | Native exporter and importer (`usbip-host`, `usbipd`, `vhci-hcd`, `usbip`) | Native local export requires installed tools and privileged setup, so it is outside the browser-only scope. The remote importer remains a possible prerequisite for a future browser-compatible solution.                                              |
+| [usbipd-win](https://github.com/dorssel/usbipd-win)                                                                                                          | Windows exporter                                                           | Existing service, CLI, and driver. Its documented non-WSL receiver is a Linux USB/IP client. Sharing requires administrator setup and persists across reboots; disconnect alone must not be treated as revocation. Its installer adds a firewall rule. |
+| [usbip-win2](https://github.com/vadimgrn/usbip-win2)                                                                                                         | Windows importer                                                           | Separate Windows virtual controller implementation. It does not replace the Windows exporter. Driver installation and device compatibility need independent validation.                                                                                |
+| [VirtualHere](https://www.virtualhere.com/usb_client_software)                                                                                               | Native USB sharing ecosystem                                               | Requires native software and is outside the browser-only scope. It has separate deployment/licensing terms and no assumed universal USB/IP wire compatibility. Its macOS client explicitly excludes microphones/webcams.                               |
+| [esptool-js](https://github.com/espressif/esptool-js), [DAP.js](https://github.com/ARMmbed/dapjs), [Tango/ya-webadb](https://github.com/yume-chan/ya-webadb) | Device-specific browser workflows                                          | Useful precedents for browser hardware access. They implement device protocols rather than making arbitrary devices available to remote native drivers.                                                                                                |
 
-These are reuse candidates, not a supported-device matrix. Even native USB/IP
+Native local exporters are excluded alternatives, not the recommended solution.
+This comparison is not a supported-device matrix. Even native USB/IP
 cannot promise every device: drivers, resets, composite interfaces, isochronous
 traffic, bandwidth, and network latency need testing. The
 [Linux USB/IP README](https://github.com/torvalds/linux/blob/master/tools/usb/usbip/README)
@@ -76,13 +85,13 @@ separate operations to validate.
 
 ## Paseo integration points
 
-The current checkout has plugin settings, RPC, and process lifecycle support;
-it has no browser USB/Serial/HID integration or native USB/IP adapter. The
-public plugin registry was also checked for USB/serial/HID entries. No matching
-integration was identified. GitHub issues, PRs, and Discussions were searched
-for USB/IP, WebUSB, WebHID, serial ports, and passthrough; no directly related
-implementation or tracking discussion was identified. This is a dated search
-result, not a claim that no external integration exists.
+The plugin below uses existing settings, RPC, and process lifecycle support.
+Core has no native USB/IP adapter. The public plugin registry and GitHub
+issues, PRs, and Discussions were searched for USB/IP, WebUSB, WebHID, serial
+ports, and passthrough before this implementation; no existing integration was
+identified. [Discussion #7380](https://github.com/getpaseo/paseo/discussions/7380)
+records the broader workflow. This is a dated search result, not a claim that
+no external integration exists.
 
 Adjacent work is [PR #6534](https://github.com/getpaseo/paseo/pull/6534), open at
 the time of this investigation. Its proposed credit-windowed TCP tunnel routes
@@ -105,119 +114,91 @@ Follow the existing [plugin runtime boundaries](plugins.md#sdk-import-boundaries
 Keep device libraries and Node APIs out of shared/client code. Adding a core
 settings page would not provide the missing exporter, importer, or data path.
 
-## Proposed minimal architecture
+## Optional browser serial plugin
 
-This is an implementation direction, not an available feature:
+`plugin-examples/browser-serial` forwards one browser-approved USB serial device
+to one TCP client on the selected Paseo host. It uses the existing plugin
+settings shell and RPC transport, Node's TCP implementation, and the browser's
+Web Serial API. It adds no runtime dependency, local native helper, kernel
+driver, protocol change, or core settings route. Install it only on a trusted
+host through the existing [plugin workflow](plugins.md#install-a-directory-source).
 
 ```mermaid
 flowchart LR
-  subgraph Local[Computer with physical USB device]
-    U[USB device] --- E[Native USB/IP exporter]
-    B[Paseo in browser]
-  end
-  subgraph Remote[Paseo host]
-    P[Optional plugin]
-    I[Native USB/IP importer and device driver] --- A[Agent tools]
-  end
-  B -->|Existing Paseo RPC: control and status| P
-  P -->|Narrow privileged adapter| I
-  I <-->|USB/IP over private authenticated transport| E
+  U[Local USB serial device] <-->|Web Serial| B[Paseo browser plugin]
+  B <-->|Existing Paseo connection and plugin RPC| P[Host plugin]
+  P <-->|Temporary loopback TCP byte stream| A[Agent tool]
 ```
 
-Start with Linux export and Linux import over a user-configured authenticated
-VPN or separately established OpenSSH port forward. Paseo's own SSH host
-transport sets `ClearAllForwardings=yes`; it does not create that USB/IP route.
-This avoids another USB implementation and leaves USB data
-outside the browser and Paseo's JSON RPC queue. It needs a route from importer
-to exporter: the ability to reach Paseo through its relay does not provide that
-route. Do not expose raw USB/IP on public TCP port 3240 or claim its protocol
-provides encryption and peer authentication.
+The browser requires HTTPS or localhost, Web Serial support, and an explicit
+selection. This example accepts USB serial ports; it does not implement a WebUSB
+serial polyfill. Native mobile and Electron show an unavailable explanation.
+Brave may require enabling its Web Serial flag. Choose a matching baud rate;
+the session uses 8 data bits, no parity, one stop bit, and no hardware flow
+control. Opening a serial port can reset some boards.
 
-Configure/export the local device through the existing native tool in the first
-experiment. The plugin can manage only devices that this exporter has explicitly
-made available. Automatic local setup or bind/unbind from the browser would
-need an additional authenticated local control agent. Pair it explicitly to the
-chosen destination and device; loopback, a CORS header, or a matching vendor ID
-is not authentication. Validate origins and peers, use short-lived capabilities,
-and avoid arbitrary command or network-address forwarding.
+The plugin exposes an ephemeral `127.0.0.1` TCP endpoint on the daemon machine.
+Agent tools can use a normal socket client without a serial-library dependency.
+The browser must keep the settings page open. Disconnect, leaving that page,
+port errors, or host-tool disconnect ends the session. Theme changes and
+switching between wide and compact layouts can remount the settings page and
+end the session too. Browser loss expires the
+host lease; there is no automatic reattachment. A new session requires selection
+again. Browser permission revocation is separate from ending the session; the
+screen offers Forget device when the browser provides that operation.
 
-For operation without a preconfigured route, a later native companion could
-initiate an authenticated outbound tunnel. That needs a bounded binary transport,
-backpressure, cancellation, reconnect semantics, and lifecycle ownership. The
-current plugin API does not supply that channel. Validate that requirement
-before proposing a reusable core transport extension. Do not relay USB requests
-through repeated JSON polling or route them through the unauthenticated service
-proxy as a shortcut.
+The raw TCP endpoint is available to processes that can reach the host's
+loopback, including other local OS users. It has no TCP authentication; use only
+a trusted machine. Browser RPC operations require the session's unpredictable
+token in addition to Paseo's existing `daemon.manage` authority. The token does
+not protect against local processes using the TCP endpoint. In Docker, loopback
+belongs to the daemon's network namespace; the agent tool must run there too.
+No public listener or discovery service is started.
 
-The plugin should depend on explicitly installed OS tools. Do not bundle kernel
-drivers, install packages, load modules, widen firewall rules, or run Paseo as
-root automatically. An OS-level privilege broker must restrict operations to
-approved exporters/devices and owned imports. Native USB data runs only during
-an active attachment; use no device polling when idle. Existing exporter
-services may remain installed/running according to their own lifecycle.
+Only one bridge and one TCP client are active per plugin installation. Each
+byte direction has a bounded buffer; overflow ends the session instead of
+silently dropping bytes. Device startup output is buffered while the first host
+tool connects. No listener or timer is created before a session. An active idle
+session uses bounded long polling and a separate lease heartbeat over existing RPCs.
+The heartbeat keeps slow serial writes from expiring the host session without
+reading ahead into an unbounded queue. This experiment is aimed
+at low-bandwidth serial consoles, not high-rate USB streaming.
 
-## Device manager and ownership
+The endpoint carries raw bytes. It implements neither RFC 2217 nor a virtual
+`/dev/tty`/COM port. Host tools cannot change baud rate, toggle DTR/RTS, or perform
+USB control transfers through it. Do not advertise it as a general firmware
+flasher: tools needing those controls or device re-enumeration need additional
+protocol work and hardware testing.
 
-Add the settings contribution only with a working native path. It must show the
-local exporter identity, selected physical device, destination Paseo host,
-prerequisite failures, attachment state, and a visible Disconnect action. Explain
-that exporting takes the device away from local applications. Require explicit
-confirmation before a native bind/import; a browser chooser grant is not that
-confirmation. Persistent USB/IP export and current attachment need separate
-controls so users can revoke both.
+## Plugin versus core decision
 
-Start with one approved device and one destination. Issue an unpredictable
-session capability, constrain it to those endpoints, and retain ownership of
-the exact imported port. Do not authorize operations solely by a supplied bus
-ID or allow another client to detach arbitrary ports. A multi-user integration
-needs an identity-aware API; the current handler context is insufficient for
-principal-scoped device grants.
+Keep serial forwarding in an optional plugin, following the
+[contribution policy](../CONTRIBUTING.md). The existing extension points cover
+the bounded use case without adding a shared UI or driver dependency. A core
+USB manager cannot remove the browser's protected-interface restrictions.
 
-Use a renewable lease owned by the native adapters so browser crashes and
-suspension cannot leave an indefinite grant. On Disconnect, lease expiry, host
-switch, plugin disable/reload, or daemon loss: detach only the owned import,
-close the owned tunnel, and revoke any export that this session created.
-Never undo an existing user-managed export without approval. Persist enough
-ownership information for crash recovery, and verify revocation at both ends.
-Stock USB/IP tools do not implement this browser lease. A supervised broker or
-equivalent OS-owned cleanup must enforce it even if the plugin/companion exits.
-Closing a tunnel alone does not revoke a persistent export. If revocation cannot
-be confirmed, show a cleanup failure instead of reporting the device as released.
-A USB reset or replug requires fresh selection; do not silently attach a new
-device that reused the bus ID. Unmount storage before an intentional detach;
-network loss is a surprise removal and cannot guarantee storage integrity.
+Revisit core only if a demonstrated reusable transport or caller-identity gap
+blocks a feasible plugin. Adjacent TCP tunnel work may support a future efficient
+binary transport. A full USB/IP approach would still need browser hardware
+access, USB request translation, and a remote importer. Native local exporters
+and privileged installed apps remain outside the local browser-only scope.
 
-## Validation before implementation can claim support
+## Validation and limits
 
-This investigation exercised no physical devices, native helpers, kernel
-modules, USB/IP transport, or new UI. Source review establishes the architecture
-and API limits; it does not establish working passthrough or measured overhead.
+The focused tests use typed synthetic serial hardware, real host TCP sockets,
+and an injected clock for lease expiry. Browser integration exercises the real
+settings UI, plugin loaders, controller, app/daemon RPC connection, and a real
+tool process launched in a Paseo workspace terminal. Only the physical serial
+device is replaced at the hardware port. No browser globals or transports are
+monkey-patched.
 
-Use disposable Linux VMs for the first experiment. The
-[Linux USB/IP README](https://github.com/torvalds/linux/blob/master/tools/usb/usbip/README)
-documents synthetic gadget export using `usbip-vudc`, a
-[configfs gadget](https://docs.kernel.org/usb/gadget_configfs.html) bound to that
-controller, and `usbipd --device`; the receiving VM uses `vhci-hcd`. This is a
-candidate for testing without a user's physical device, not a verified setup in
-this investigation. Validate the test kernels' gadget and USB/IP support first;
-do not load those modules on a shared production host. Then prove:
+No physical serial device, Brave installation, native mobile device, Electron
+hardware permission flow, or encrypted relay was exercised for this feature.
+Synthetic echo traffic proves the byte path, not device compatibility or
+firmware-flashing support. No full USB/IP device enumeration is claimed.
 
-1. The remote OS enumerates the imported device and its real driver exchanges
-   data. Device listing or a synthetic TCP echo is insufficient evidence.
-2. Both transfer directions preserve bytes, submission/unlink behavior, errors,
-   and reset handling through the chosen transport. Bound memory under a stalled
-   receiver and reject excess connections.
-3. Disconnect, expired lease, lost browser, host switch, crashed companion, plugin
-   reload, and daemon exit release only owned resources and prevent reattachment
-   without consent. An unrelated attachment/export survives each test.
-4. Unpaired clients and a second browser cannot list, import, detach, or revoke
-   devices outside their grant. Revocation also blocks direct exporter access.
-5. A real representative device works on each advertised exporter/importer OS
-   pair. Cover composite devices and latency-sensitive transfers before extending
-   the compatibility claim. Report idle/active CPU, RSS, throughput, latency,
-   and recovery time instead of assuming that reusing USB/IP makes it lightweight.
-
-Keep the first implementation in an optional plugin. Revisit core only for a
-demonstrated reusable transport or caller-identity gap, following
-[the contribution policy](../CONTRIBUTING.md). Without an acceptable native
-component, retain this as a feasibility result and leave full USB/IP unsupported.
+Before expanding support, verify the actual device on each advertised browser
+and OS pair, including permission refusal, unplug, reset, browser suspension,
+host switching, plugin reload, and daemon loss. Confirm that serial stream locks
+and owned host sockets are released. Measure idle/active CPU, RSS, throughput,
+latency, and recovery time before making performance claims.

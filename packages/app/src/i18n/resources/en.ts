@@ -1184,6 +1184,7 @@ export const en = {
         label: "Show",
         branch: "Branch",
         project: "Project",
+        repository: "Repository",
         host: "Host",
         changeRequest: "Pull request",
         checks: "Checks",

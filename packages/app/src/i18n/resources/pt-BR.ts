@@ -1202,6 +1202,7 @@ export const ptBR: TranslationResources = {
         label: "Mostrar",
         branch: "Branch",
         project: "Projeto",
+        repository: "Repositório",
         host: "Host",
         changeRequest: "Pull request",
         checks: "Verificações",

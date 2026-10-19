@@ -1,0 +1,35 @@
+Workspace root-change browser capture — 19 October 2026
+Source head: 467e6b94935ed1b377f459c3b477a162cde0f738
+Platform: Linux, Playwright headless Chromium browser web, viewport 1280x800.
+Data: new temporary workspace/directories and synthetic conversation; mock provider.
+
+Command (external capture config; paths abbreviated):
+env -u PASEO_PASSWORD PASEO_NODE_INSPECT=0 npm run test:e2e --workspace=packages/app -- --config=<capture>/playwright.config.ts
+
+Actual output excerpt:
+CAPTURE PASS: invalid path rejected; root updated; same workspace ID, title and synthetic conversation visible after reload.
+  1 passed (1.1m)
+
+Assertions:
+- Opening Change workspace root initially shows the existing directory.
+- A missing path displays an error and leaves the stored workspace root unchanged.
+- Submitting an existing directory updates the root for the same workspace ID.
+- After reload, the workspace title and synthetic conversation remain visible.
+- Reopening the dialog shows the new directory.
+
+Media:
+The screenshots compare the same PR build before/after invoking the action.
+The GIF is sampled from the actual recorded WebM, not a generated illustration.
+No old-build regression comparison or GitHub video player is claimed.
+
+Setup and limits:
+An external Metro configuration uses preinstalled dependencies and canonical
+React Navigation resolution to avoid duplicate packages in the shared installation.
+The temporary test process clears the inherited password; production is untouched.
+Test daemon and Metro were stopped by the capture runner.
+The dependency build encountered ACP type errors in packages/plugin; installed
+artifacts were reused. This is not evidence of a clean full build, typecheck or lint.
+The earlier suites were not rerun. Real-provider continuation, native iOS/Android,
+Electron, other OSes and contributor hands-on QA remain unverified.
+An authenticated attachment-policy probe returned HTTP 422; an embedded GIF is
+provided instead of claiming a playable GitHub video.

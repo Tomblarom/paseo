@@ -33,6 +33,72 @@ test("display preferences hover follows the pointer without highlighting the fir
   }
 });
 
+test("activity-day grouping preserves pins, collapse, preferences, and midnight rollover", async ({
+  page,
+}) => {
+  const active = await seedMockAgentWorkspace({ repoPrefix: "day-active-", title: "Active today" });
+  const older = await seedWorkspace({ repoPrefix: "day-older-", title: "No activity" });
+  try {
+    await active.client.sendAgentMessage(active.agentId, "Reply with hello.");
+    await active.client.waitForAgentUpsert(
+      active.agentId,
+      (snapshot) => snapshot.status === "idle",
+      15_000,
+    );
+    await page.clock.install();
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    await chooseSidebarSort(page, "workspace", "name");
+    await openSidebarDisplayPage(page, "sidebar-display-grouping");
+    await page.getByTestId("sidebar-grouping-day").click();
+    const activeId = `sidebar-workspace-row-${getServerId()}:${active.workspaceId}`;
+    const olderId = `sidebar-workspace-row-${getServerId()}:${older.workspaceId}`;
+    const today = page.getByTestId("sidebar-status-group-rows-today");
+    await expect(today.getByTestId(activeId)).toBeVisible();
+    await expect(
+      page.getByTestId("sidebar-status-group-rows-older").getByTestId(olderId),
+    ).toBeVisible();
+    await older.client.setWorkspacePinned(older.workspaceId, true);
+    await expect(page.getByTestId("sidebar-pinned-section").getByTestId(olderId)).toBeVisible();
+    await expect(page.getByTestId("sidebar-status-group-older")).toHaveCount(0);
+    await page.getByTestId("sidebar-status-group-today").click();
+    await expect(today).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId("sidebar-status-group-today")).toBeVisible();
+    await expect(today).toHaveCount(0);
+    await page.getByTestId("sidebar-status-group-today").click();
+    await expect(today.getByTestId(activeId)).toBeVisible();
+    await openWorkspaceSettings(page);
+    await expectRunningFirstSetting(page, "workspace", { enabled: true });
+    await expectRunningFirstSetting(page, "project", {
+      enabled: false,
+      statusText: "Group by Project",
+    });
+    await gotoAppShell(page);
+    await expect(today.getByTestId(activeId)).toBeVisible();
+    const untilMidnight = await page.evaluate(() => {
+      const current = new Date();
+      const midnight = new Date(current);
+      midnight.setHours(24, 0, 0, 0);
+      return midnight.getTime() - current.getTime() + 2_000;
+    });
+    await page.clock.fastForward(untilMidnight);
+    await expect(
+      page.getByTestId("sidebar-status-group-rows-yesterday").getByTestId(activeId),
+    ).toBeVisible();
+    await expect(page.getByTestId("sidebar-status-group-today")).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath("activity-day.png") });
+    await openSidebarDisplayPage(page, "sidebar-display-grouping");
+    await page.getByTestId("sidebar-grouping-project").click();
+    await page.getByTestId("sidebar-display-preferences-menu").click();
+    await expect(page.getByTestId("sidebar-display-workspace-sorting")).toContainText("Name");
+    await page.keyboard.press("Escape");
+  } finally {
+    await active.cleanup();
+    await older.cleanup();
+  }
+});
+
 test("recent-activity sorting follows chat activity, preserves pins, and survives reload", async ({
   page,
 }) => {

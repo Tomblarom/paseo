@@ -20,7 +20,12 @@ import {
   type SidebarShortcutModel,
   type SidebarShortcutSection,
 } from "@/utils/sidebar-shortcuts";
-import { statusWorkspaceGroups, type SidebarWorkspaceGroup } from "./sidebar-labels";
+import {
+  statusWorkspaceGroups,
+  dayWorkspaceGroups,
+  type SidebarWorkspaceGroup,
+} from "./sidebar-labels";
+import { buildDayGroups } from "@/hooks/sidebar-day-view-model";
 
 export interface SidebarProjection {
   pinnedGroups: PinnedSidebarGroups;
@@ -45,6 +50,7 @@ export interface SidebarProjectionInput {
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   projectNamesByViewKey: Map<string, string>;
   groupMode: SidebarGroupMode;
+  now?: Date;
   sortMode?: SidebarSortMode;
   workspaceActivityRunningFirst?: boolean;
   pinnedCollapsed: boolean;
@@ -103,7 +109,7 @@ export function buildSidebarProjection(input: SidebarProjectionInput): SidebarPr
   };
 }
 
-/** Project mode keeps its project headers and groups nothing; status mode groups the rows. */
+/** Project mode retains project headers; other modes group the unpinned rows. */
 function buildWorkspaceGroups(
   input: SidebarProjectionInput,
   unpinnedWorkspaces: SidebarWorkspaceEntry[],
@@ -120,6 +126,15 @@ function buildWorkspaceGroups(
           sortMode: input.sortMode,
           runningFirst: input.workspaceActivityRunningFirst,
           workspaceOrderByStatus: input.workspaceOrderByStatus,
+        }),
+      );
+    case "day":
+      return dayWorkspaceGroups(
+        buildDayGroups({
+          workspaces: unpinnedWorkspaces,
+          runningFirst: input.workspaceActivityRunningFirst,
+          t: input.t,
+          now: input.now,
         }),
       );
   }

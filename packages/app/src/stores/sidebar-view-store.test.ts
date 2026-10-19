@@ -30,6 +30,34 @@ function createMemoryStorage(entries: Record<string, string | null>): MemoryStor
 }
 
 describe("sidebar view store", () => {
+  it("retains activity-day grouping with independent sort preferences and filters", () => {
+    expect(
+      migrateSidebarViewState({
+        groupMode: "day",
+        sortMode: "name",
+        projectSortMode: "recent",
+        workspaceActivityRunningFirst: true,
+        projectFilters: ["project-a"],
+        hostFilters: ["host-a"],
+        labelFilter: { labels: ["Urgent"] },
+      }),
+    ).toMatchObject({
+      groupMode: "day",
+      sortMode: "name",
+      projectSortMode: "recent",
+      workspaceActivityRunningFirst: true,
+      projectFilters: ["project-a"],
+      hostFilters: ["host-a"],
+      labelFilter: { labels: ["urgent"] },
+    });
+    const store = useSidebarViewStore.getState();
+    store.setGroupMode("day");
+    store.setGroupMode("project");
+    store.setGroupMode("day");
+    expect(useSidebarViewStore.getState().groupMode).toBe("day");
+    store.setGroupMode("project");
+  });
+
   it("keeps manual ordering by default for fresh and existing installations", () => {
     expect(useSidebarViewStore.getInitialState()).toMatchObject({
       sortMode: "manual",

@@ -2,6 +2,7 @@ import type { Page, TestInfo } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "../support/fixtures";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
+import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
 import { renameModalInput, renameModalSubmit } from "../support/helpers/rename";
 import type { SeedDaemonClient } from "../support/helpers/seed-client";
 
@@ -303,6 +304,55 @@ test.describe("Compact workspace header swipes", () => {
       await expect(composer).toHaveValue("Retained new agent draft");
       await captureScreen(page, testInfo, "swiped-to-draft");
     } finally {
+      await session.cleanup();
+    }
+  });
+
+  test("switches persisted tabs while workspace and chat responses are pending", async ({
+    page,
+  }, testInfo) => {
+    const session = await seedMockAgentWorkspace({
+      repoPrefix: "compact-header-loading-",
+      title: "Loading chat",
+    });
+    const gate = await installDaemonWebSocketGate(page);
+    try {
+      await openAgentRoute(page, session);
+      await createTabFromSwitcher(page, "New agent");
+      const composer = page
+        .getByRole("textbox", { name: "Message agent..." })
+        .filter({ visible: true });
+      await composer.fill("Draft available before the chat loads");
+      await openTabSwitcher(page);
+      await page.getByText("Loading chat", { exact: true }).click();
+      await expect(page.getByRole("button", { name: "Bottom sheet backdrop" })).toHaveCount(0);
+
+      gate.holdNextServerMessage("checkout_status_response");
+      gate.holdTimelineResponses(session.agentId);
+      await page.reload({ waitUntil: "commit" });
+      await gate.waitForHeldServerMessage("checkout_status_response");
+      await gate.waitForHeldTimelineResponse();
+      await expect(page.getByRole("button", { name: /Switch tabs/ })).toHaveText("2");
+      await expect(page.getByTestId("agent-loading").filter({ visible: true })).toHaveCount(1);
+      await captureScreen(page, testInfo, "pending-workspace-and-chat");
+
+      const area = await page.getByTestId("workspace-tab-swipe-area").boundingBox();
+      if (!area) throw new Error("Workspace header is not visible while loading");
+      await touchSwipe(page, { x: 150, y: area.y + area.height - 24 }, -130);
+      await expect(composer).toHaveValue("Draft available before the chat loads");
+      await captureScreen(page, testInfo, "swiped-before-responses");
+
+      await touchSwipe(page, { x: 150, y: area.y + area.height - 24 }, 130);
+      await expect(composer).toHaveCount(0);
+      await openTabSwitcher(page);
+      await page.getByText("New Agent", { exact: true }).click();
+      await expect(composer).toHaveValue("Draft available before the chat loads");
+      gate.releaseHeldServerMessage("checkout_status_response");
+      gate.releaseHeldTimelineResponses();
+      await expect(page.getByTestId("workspace-header-title")).toBeVisible();
+      await expect(composer).toHaveValue("Draft available before the chat loads");
+    } finally {
+      gate.releaseHeldTimelineResponses();
       await session.cleanup();
     }
   });

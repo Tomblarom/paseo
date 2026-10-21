@@ -6,6 +6,7 @@ import {
   type renewBridge,
   type writeBridge,
   type closeBridge,
+  type releaseBridge,
 } from "../shared/bridge";
 
 export interface SerialReader {
@@ -39,6 +40,7 @@ export interface BridgeRpc {
   renew(input: RpcInput<typeof renewBridge>): Promise<unknown>;
   write(input: RpcInput<typeof writeBridge>): Promise<unknown>;
   close(input: RpcInput<typeof closeBridge>): Promise<unknown>;
+  release(input: RpcInput<typeof releaseBridge>): Promise<unknown>;
 }
 export interface SerialState {
   baudRate: number;
@@ -48,6 +50,8 @@ export interface SerialState {
   connected: boolean;
   error: string | null;
   canForget: boolean;
+  releasing: boolean;
+  releaseError: string | null;
 }
 interface Run {
   stopped: boolean;
@@ -78,6 +82,8 @@ export class SerialSession {
     connected: false,
     error: null,
     canForget: false,
+    releasing: false,
+    releaseError: null,
   };
   private listeners = new Set<() => void>();
   private run?: Run;
@@ -194,6 +200,21 @@ export class SerialSession {
       if (result.data) await run.writer!.write(this.browser.decode(result.data));
     }
   }
+  async release() {
+    const run = this.run;
+    if (!run || this.state.phase !== "active" || !this.state.connected || this.state.releasing)
+      return;
+    this.update({ releasing: true, releaseError: null });
+    try {
+      await this.rpc.release({ token: run.token! });
+      if (this.run === run && !run.stopped) this.update({ connected: false });
+    } catch (error) {
+      if (this.run === run && !run.stopped)
+        this.update({ releaseError: error instanceof Error ? error.message : String(error) });
+    } finally {
+      if (this.run === run && !run.stopped) this.update({ releasing: false });
+    }
+  }
   stop(error?: unknown): Promise<void> {
     const run = this.run;
     if (!run) return Promise.resolve();
@@ -235,6 +256,8 @@ export class SerialSession {
       phase: "idle",
       endpoint: null,
       connected: false,
+      releasing: false,
+      releaseError: null,
       canForget: Boolean(this.lastPort?.forget),
       error:
         this.state.error ??

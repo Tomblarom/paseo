@@ -461,21 +461,325 @@ describe("browser serial example bridge", () => {
     }
   });
 
-  it("closes the whole bridge when the host disconnects", async () => {
+  it("hands off to a new client on the same endpoint when the host disconnects", async () => {
+    const bridge = new SerialBridge();
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const first = await connect(port);
+      sockets.push(first);
+      first.write(Buffer.from([1]));
+      const synced = await bridge.poll(token);
+      expect(synced.connected).toBe(true);
+      const pending = bridge.poll(token);
+      first.destroy();
+      await expect(pending).resolves.toEqual({ data: "", connected: false, closed: false });
+      await expect(bridge.create()).rejects.toThrow("already active");
+      const second = await connect(port);
+      sockets.push(second);
+      second.write(Buffer.from([2]));
+      const inbound = await bridge.poll(token);
+      expect(inbound.connected).toBe(true);
+      expect(Buffer.from(inbound.data, "base64")).toEqual(Buffer.from([2]));
+      const received = readBytes(second, 3);
+      await bridge.write(token, Buffer.from([9, 8, 7]).toString("base64"));
+      expect(await received).toEqual(Buffer.from([9, 8, 7]));
+      // Explicit close still ends the bridge even with an owner connected.
+      const closed = new Promise<void>((resolve) => {
+        second.once("close", () => resolve());
+      });
+      await bridge.close(token);
+      await closed;
+      await expect(bridge.poll(token)).resolves.toEqual({
+        data: "",
+        connected: false,
+        closed: true,
+      });
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("preserves FIFO order across repeated graceful handoffs", async () => {
+    const bridge = new SerialBridge();
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      for (let round = 0; round < 3; round++) {
+        const socket = await connect(port);
+        sockets.push(socket);
+        socket.write(Buffer.from([round]));
+        const inbound = await bridge.poll(token);
+        expect(inbound.connected).toBe(true);
+        expect(Buffer.from(inbound.data, "base64")).toEqual(Buffer.from([round]));
+        const received = readBytes(socket, 2);
+        await bridge.write(token, Buffer.from([round, round]).toString("base64"));
+        expect(await received).toEqual(Buffer.from([round, round]));
+        const pending = bridge.poll(token);
+        socket.destroy();
+        await expect(pending).resolves.toEqual({ data: "", connected: false, closed: false });
+      }
+      // Bytes written during the gap buffer for the next owner, in order.
+      await bridge.write(token, Buffer.from("gap").toString("base64"));
+      const last = await connect(port);
+      sockets.push(last);
+      expect(await readBytes(last, 3)).toEqual(Buffer.from("gap"));
+      await bridge.close(token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("explicitly releases the slot without ending the bridge", async () => {
     const bridge = new SerialBridge();
     const sockets: net.Socket[] = [];
     try {
       const { token, port } = await bridge.create();
       const socket = await connect(port);
       sockets.push(socket);
+      socket.write(Buffer.from([1]));
+      const synced = await bridge.poll(token);
+      expect(synced.connected).toBe(true);
       const pending = bridge.poll(token);
-      socket.destroy();
-      expect(await pending).toMatchObject({ closed: true });
-      const again = await bridge.poll(token).catch((error: Error) => error);
-      expect(again instanceof Error || (again as { closed: boolean }).closed).toBe(true);
-      // A fresh bridge works after the disconnect close.
+      const closed = new Promise<void>((resolve) => {
+        socket.once("close", () => resolve());
+      });
+      await expect(bridge.release(token)).resolves.toEqual({});
+      await closed;
+      expect(socket.destroyed).toBe(true);
+      await expect(pending).resolves.toEqual({ data: "", connected: false, closed: false });
+      // Repeated release with no owner is a no-op success.
+      await expect(bridge.release(token)).resolves.toEqual({});
+      await expect(bridge.create()).rejects.toThrow("already active");
+      const next = await connect(port);
+      sockets.push(next);
+      next.write(Buffer.from([2]));
+      const inbound = await bridge.poll(token);
+      expect(inbound.connected).toBe(true);
+      expect(Buffer.from(inbound.data, "base64")).toEqual(Buffer.from([2]));
+      await bridge.close(token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("rejects release for unknown tokens without touching the bridge", async () => {
+    const bridge = new SerialBridge();
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      await expect(bridge.release("wrong")).rejects.toThrow("Unknown bridge token");
+      const socket = await connect(port);
+      sockets.push(socket);
+      socket.write(Buffer.from([1]));
+      const synced = await bridge.poll(token);
+      expect(synced.connected).toBe(true);
+      await bridge.close(token);
+      // The most recently closed token succeeds without touching anything.
+      await expect(bridge.release(token)).resolves.toEqual({});
       const second = await bridge.create();
+      await expect(bridge.release(token)).resolves.toEqual({});
+      const next = await connect(second.port);
+      sockets.push(next);
+      next.write(Buffer.from([2]));
+      const inbound = await bridge.poll(second.token);
+      expect(Buffer.from(inbound.data, "base64")).toEqual(Buffer.from([2]));
       await bridge.close(second.token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("rejects concurrent clients across handoff", async () => {
+    const bridge = new SerialBridge();
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const first = await connect(port);
+      sockets.push(first);
+      first.write(Buffer.from([1]));
+      const synced = await bridge.poll(token);
+      expect(synced.connected).toBe(true);
+      const busy = await connect(port);
+      sockets.push(busy);
+      await new Promise<void>((resolve) => {
+        if (busy.destroyed) resolve();
+        else busy.once("close", () => resolve());
+      });
+      expect(busy.destroyed).toBe(true);
+      const pending = bridge.poll(token);
+      first.destroy();
+      await expect(pending).resolves.toEqual({ data: "", connected: false, closed: false });
+      const third = await connect(port);
+      sockets.push(third);
+      const fourth = await connect(port);
+      sockets.push(fourth);
+      await new Promise<void>((resolve) => {
+        if (fourth.destroyed) resolve();
+        else fourth.once("close", () => resolve());
+      });
+      expect(fourth.destroyed).toBe(true);
+      expect(third.destroyed).toBe(false);
+      third.write(Buffer.from([3]));
+      const inbound = await bridge.poll(token);
+      expect(inbound.connected).toBe(true);
+      expect(Buffer.from(inbound.data, "base64")).toEqual(Buffer.from([3]));
+      await bridge.close(token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("keeps the new owner healthy when the old socket tears down late", async () => {
+    const bridge = new SerialBridge();
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const first = await connect(port);
+      sockets.push(first);
+      first.write(Buffer.from([1]));
+      const synced = await bridge.poll(token);
+      expect(synced.connected).toBe(true);
+      // Second handshake already in flight while the slot is still owned; the
+      // release below frees the slot synchronously, so the late accept must
+      // win and the old socket's teardown must not harm the new owner.
+      const incoming = net.connect(port, "127.0.0.1");
+      incoming.on("error", () => {});
+      const firstClosed = new Promise<void>((resolve) => {
+        first.once("close", () => resolve());
+      });
+      await bridge.release(token);
+      await new Promise<void>((resolve, reject) => {
+        incoming.once("connect", () => {
+          incoming.off("error", reject);
+          resolve();
+        });
+        incoming.once("error", reject);
+      });
+      sockets.push(incoming);
+      await firstClosed;
+      incoming.write(Buffer.from([7]));
+      const inbound = await bridge.poll(token);
+      expect(inbound.connected).toBe(true);
+      expect(Buffer.from(inbound.data, "base64")).toEqual(Buffer.from([7]));
+      const received = readBytes(incoming, 2);
+      await bridge.write(token, Buffer.from([8, 8]).toString("base64"));
+      expect(await received).toEqual(Buffer.from([8, 8]));
+      await expect(bridge.create()).rejects.toThrow("already active");
+      await bridge.close(token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("settles a genuinely pending device-to-host write on release without duplicating it", async () => {
+    // Loopback sockets flush synchronously, so backpressure needs a corked
+    // first socket: its writes buffer instead of flushing, which parks the
+    // write in the drain wait deterministically. Later owners stay uncorked.
+    let corked = false;
+    const bridge = new SerialBridge({
+      createServer: () => {
+        const listener = net.createServer({ highWaterMark: 16 });
+        listener.on("connection", (socket) => {
+          if (!corked) {
+            corked = true;
+            socket.cork();
+          }
+        });
+        return listener;
+      },
+    });
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const first = await connect(port);
+      sockets.push(first);
+      first.write(Buffer.from([1]));
+      const synced = await bridge.poll(token);
+      expect(synced.connected).toBe(true);
+      const pending = bridge.write(token, randomBytes(1024).toString("base64"));
+      let settled = false;
+      void pending.then(
+        () => (settled = true),
+        () => (settled = true),
+      );
+      // Microtasks only: drain and close need an I/O turn, so a settled flag
+      // here would mean the write never parked. It must still be pending.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).toBe(false); // genuinely pending BEFORE release
+      const closed = new Promise<void>((resolve) => {
+        first.once("close", () => resolve());
+      });
+      await bridge.release(token);
+      await closed;
+      await expect(pending).resolves.toEqual({});
+      // The next owner works and receives only new bytes, never a replay.
+      const next = await connect(port);
+      sockets.push(next);
+      next.write(Buffer.from([2]));
+      const inbound = await bridge.poll(token);
+      expect(inbound.connected).toBe(true);
+      expect(Buffer.from(inbound.data, "base64")).toEqual(Buffer.from([2]));
+      const received = readBytes(next, 2);
+      await bridge.write(token, Buffer.from([8, 8]).toString("base64"));
+      expect(await received).toEqual(Buffer.from([8, 8]));
+      await bridge.close(token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("expires the lease across handoffs without browser polls", async () => {
+    const clock = new FakeClock();
+    const bridge = new SerialBridge({ clock, leaseMs: 20_000, pollTimeoutMs: 60_000 });
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const first = await connect(port);
+      sockets.push(first);
+      await bridge.release(token);
+      const second = await connect(port);
+      sockets.push(second);
+      const closed = new Promise<void>((resolve) => {
+        second.once("close", () => resolve());
+      });
+      clock.advance(20_000); // handoff renewed nothing: the create lease fires
+      await closed;
+      await expect(bridge.poll(token)).resolves.toEqual({
+        data: "",
+        connected: false,
+        closed: true,
+      });
+      expect(clock.pendingTimers).toBe(0);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("closes the bridge on new-owner overflow after handoff", async () => {
+    const bridge = new SerialBridge({ maxBufferedBytes: 64 });
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const first = await connect(port);
+      sockets.push(first);
+      await bridge.release(token);
+      const second = await connect(port);
+      sockets.push(second);
+      const closed = new Promise<void>((resolve) => {
+        second.once("close", () => resolve());
+      });
+      second.write(Buffer.alloc(65, 0x41));
+      await closed;
+      expect(second.destroyed).toBe(true);
+      await expect(bridge.poll(token)).resolves.toEqual({
+        data: "",
+        connected: false,
+        closed: true,
+      });
+      const fresh = await bridge.create();
+      await bridge.close(fresh.token);
     } finally {
       await dispose(bridge, sockets);
     }

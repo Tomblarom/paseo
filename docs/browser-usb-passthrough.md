@@ -143,7 +143,8 @@ The connection belongs to the host's client plugin installation, so you can
 switch to an agent and return to settings without losing the device, endpoint,
 or chosen baud rate. Theme and layout changes also preserve the session. Keep
 the browser tab open. Disconnect, tab reload/closure, plugin teardown, port
-errors, or host-tool disconnect ends the session. Browser loss expires the
+errors, or buffer overflow ends the device session. A host-tool disconnect
+releases the TCP slot while preserving the selected device and endpoint. Browser loss expires the
 host lease; there is no automatic reattachment. A new session requires selection
 again. Browser permission revocation is separate from ending the session; the
 screen offers Forget device when the browser provides that operation.
@@ -157,11 +158,16 @@ belongs to the daemon's network namespace; the agent tool must run there too.
 No public listener or discovery service is started.
 
 Only one bridge and one TCP client are active per plugin installation. Give the
-displayed endpoint to the agent that will own the connection. Other agents must
-coordinate with that owner; concurrent clients are rejected. Do not probe the
-port with a temporary connection: closing that probe ends the device session,
-so a later tool cannot reuse the port. There is no machine-readable discovery
-endpoint or automatic handoff between tools.
+displayed endpoint to the agent that will own the connection. Concurrent clients
+are rejected. To hand over, finish pending device commands and close that tool's
+TCP connection, or choose **Release host tool** in the browser. Another agent can
+then connect to the same endpoint without selecting the device again. Release
+keeps the serial port open; it does not reset the device or isolate delayed
+responses from the previous tool. Forcing release can truncate bytes still being
+sent to the departing tool. Agents must coordinate command boundaries. The first
+local process to connect after release owns the next slot.
+**Disconnect** ends the whole device session. There is no machine-readable
+endpoint discovery service.
 
 Each byte direction has a bounded buffer; overflow ends the session instead of
 silently dropping bytes. Device startup output is buffered while the first host

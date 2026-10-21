@@ -34,6 +34,9 @@ export interface BridgeOptions {
   pollTimeoutMs?: number;
   maxBufferedBytes?: number;
   clock?: BridgeClock;
+  // Test seam for deterministic backpressure (e.g. a low highWaterMark).
+  // Production always uses the default loopback listener.
+  createServer?: () => net.Server;
 }
 
 export interface PollResult {
@@ -80,19 +83,21 @@ export class SerialBridge {
   private readonly leaseMs: number;
   private readonly pollMs: number;
   private readonly maxBuffered: number;
+  private readonly createServer: () => net.Server;
 
   constructor(options: BridgeOptions = {}) {
     this.clock = options.clock ?? systemClock;
     this.leaseMs = options.leaseMs ?? LEASE_MS;
     this.pollMs = options.pollTimeoutMs ?? POLL_MS;
     this.maxBuffered = options.maxBufferedBytes ?? MAX_BUFFERED_BYTES;
+    this.createServer = options.createServer ?? (() => net.createServer());
   }
 
   async create(): Promise<{ token: string; port: number }> {
     if (this.disposed) throw new Error("Serial bridge is disposed.");
     if (this.session) throw new Error("A serial bridge is already active.");
     const token = randomBytes(32).toString("hex");
-    const listener = net.createServer();
+    const listener = this.createServer();
     const session: Session = {
       token,
       listener,
@@ -168,6 +173,9 @@ export class SerialBridge {
     if (!session || session.token !== token) throw new Error("Unknown bridge token.");
     const chunk = decodeChunk(data);
     if (chunk.length === 0) return {};
+    // Bytes go to whoever owns the slot at send time. A concurrent slot
+    // release may truncate them at the boundary without failing this write;
+    // they are never re-sent to the next owner (no duplicates).
     const tcp = session.tcp;
     if (tcp && !tcp.destroyed) {
       if (tcp.writableLength + chunk.length > this.maxBuffered) {
@@ -194,6 +202,20 @@ export class SerialBridge {
     return {};
   }
 
+  // Frees the current TCP owner so another host tool can connect to the same
+  // endpoint. The listener, port, token, browser lease, and bounded queues
+  // survive. Authorization matches close(): unknown tokens fail, the most
+  // recently closed token succeeds without touching any live bridge.
+  async release(token: string): Promise<{}> {
+    const session = this.session;
+    if (session && session.token === token) {
+      this.releaseSlot(session);
+      return {};
+    }
+    if (token !== this.lastClosedToken) throw new Error("Unknown bridge token.");
+    return {};
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -213,7 +235,8 @@ export class SerialBridge {
       socket.write(flushed);
     }
     socket.on("data", (data: Buffer) => {
-      if (this.session !== session || session.closed) return;
+      // A superseded socket must not queue bytes or disturb the new owner.
+      if (this.session !== session || session.closed || session.tcp !== socket) return;
       session.inbound.push(data);
       session.inboundLength += data.length;
       if (session.inboundLength > this.maxBuffered) {
@@ -230,8 +253,8 @@ export class SerialBridge {
     });
     socket.on("error", () => socket.destroy());
     socket.on("close", () => {
-      if (session.tcp === socket) session.tcp = null;
-      this.closeSession(session); // host disconnect ends the whole bridge
+      if (this.session !== session || session.closed || session.tcp !== socket) return;
+      this.releaseSlot(session); // host disconnect frees only this client's slot
     });
     if (session.pending) {
       this.resolvePending(session, {
@@ -269,25 +292,52 @@ export class SerialBridge {
   }
 
   private waitForDrain(session: Session, socket: net.Socket): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve) => {
       const cleanup = () => {
         socket.off("drain", onDrain);
-        socket.off("close", onDead);
-        socket.off("error", onDead);
+        socket.off("close", onReleased);
+        socket.off("error", onReleased);
       };
       const onDrain = () => {
         cleanup();
         resolve();
       };
-      const onDead = () => {
+      // The owner may disconnect or be released while a device->host write
+      // awaits drain. Resolve instead of rejecting: rejecting here would kill
+      // the browser session on a routine handoff. In-flight bytes addressed
+      // to the departed owner are truncated at the slot boundary.
+      const onReleased = () => {
         cleanup();
-        reject(new Error("TCP connection lost during bridge write."));
+        resolve();
       };
       socket.once("drain", onDrain);
-      socket.once("close", onDead);
-      socket.once("error", onDead);
-      if (session.closed || socket.destroyed) onDead();
+      socket.once("close", onReleased);
+      socket.once("error", onReleased);
+      if (session.closed || socket.destroyed || session.tcp !== socket) onReleased();
     });
+  }
+
+  // Frees the current TCP owner without ending the bridge. Listener, port,
+  // token, browser lease, and bounded queues survive, so the next client
+  // connects to the SAME endpoint. Queues are client-independent once
+  // accepted: received tool->device bytes stay queued for the browser, and
+  // device->host bytes written during the gap buffer for the next owner.
+  // FIFO order is preserved and nothing is re-sent. There is no transaction
+  // isolation: a partial command from the old owner concatenates with the new
+  // owner's bytes at the device, and delayed hardware responses cannot be
+  // attributed to one owner. Hand over only between complete commands.
+  private releaseSlot(session: Session): void {
+    const tcp = session.tcp;
+    if (!tcp) return; // idempotent: no owner, no state change, polls stay parked
+    session.tcp = null;
+    tcp.destroy();
+    if (session.pending) {
+      this.resolvePending(session, {
+        data: this.takeChunk(session),
+        connected: false,
+        closed: false,
+      });
+    }
   }
 
   private closeSession(session: Session): void {

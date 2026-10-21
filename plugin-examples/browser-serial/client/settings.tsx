@@ -28,6 +28,9 @@ export function SerialSettings({
   const disconnect = useCallback(() => {
     void session.stop();
   }, [session]);
+  const release = useCallback(() => {
+    void session.release();
+  }, [session]);
   const forget = useCallback(() => {
     void session.forget();
   }, [session]);
@@ -66,6 +69,16 @@ export function SerialSettings({
                 ? "Host tool connected. Binary data flows in both directions."
                 : "Waiting for an agent tool to connect to this TCP endpoint."
             }
+          />
+        ) : null}
+        {state.phase !== "idle" && state.phase !== "forgetting" ? (
+          <SettingsAction
+            label="Host tool access"
+            hint="Release the current tool so another agent can connect to the same TCP endpoint. The device stays connected. Finish pending device commands before handing over."
+            actionLabel={state.releasing ? "Releasing…" : "Release host tool"}
+            onPress={release}
+            disabled={state.phase !== "active" || !state.connected || state.releasing}
+            error={state.releaseError}
           />
         ) : null}
         {state.phase !== "idle" && state.phase !== "forgetting" ? (

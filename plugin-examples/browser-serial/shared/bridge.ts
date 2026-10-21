@@ -39,6 +39,12 @@ export const closeBridge = defineRpc({
   output: z.object({}),
 });
 
+export const releaseBridge = defineRpc({
+  name: "serial.release",
+  input: z.object({ token }),
+  output: z.object({}),
+});
+
 export const renewBridge = defineRpc({
   name: "serial.renew",
   input: z.object({ token }),

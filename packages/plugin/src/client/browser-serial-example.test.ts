@@ -108,6 +108,9 @@ function fixture() {
     async renew() {
       events.push("renew");
     },
+    async release() {
+      events.push("release");
+    },
     async close() {
       events.push("close-bridge");
       poll.resolve({ data: "", connected: false, closed: true });
@@ -150,6 +153,51 @@ function countEvents(events: string[], name: string) {
   return events.filter((event) => event === name).length;
 }
 describe("browser serial session", () => {
+  it("releases only the host tool, blocks duplicates and keeps release failures retryable", async () => {
+    const f = fixture();
+    f.session.connect(9600);
+    f.opened.resolve();
+    f.created.resolve({ token: "test-token", port: 12345 });
+    await until(() => f.session.getSnapshot().phase === "active");
+    f.poll.resolve({ data: "", connected: true, closed: false });
+    await until(() => f.session.getSnapshot().connected);
+    const released = deferred<void>();
+    f.rpc.release = () => {
+      f.events.push("release");
+      return released.promise;
+    };
+    const pending = f.session.release();
+    expect(f.session.getSnapshot().releasing).toBe(true);
+    await f.session.release();
+    expect(countEvents(f.events, "release")).toBe(1);
+    released.reject(new Error("Host tool release failed"));
+    await pending;
+    expect(f.session.getSnapshot()).toMatchObject({
+      phase: "active",
+      connected: true,
+      releasing: false,
+      releaseError: "Host tool release failed",
+      endpoint: "127.0.0.1:12345",
+    });
+    f.rpc.release = async () => {
+      f.events.push("release");
+    };
+    await f.session.release();
+    expect(f.session.getSnapshot()).toMatchObject({
+      phase: "active",
+      connected: false,
+      releasing: false,
+      releaseError: null,
+      endpoint: "127.0.0.1:12345",
+      baudRate: 9600,
+    });
+    expect(f.events).not.toContain("close-port");
+    expect(f.events).not.toContain("close-bridge");
+    expect(f.events).not.toContain("cancel-heartbeat");
+    await f.session.release();
+    expect(countEvents(f.events, "release")).toBe(2);
+    await f.unmount();
+  });
   it("keeps forwarding and retains baud rate without a settings subscriber until plugin cleanup", async () => {
     const f = fixture();
     let state = f.session.getSnapshot();

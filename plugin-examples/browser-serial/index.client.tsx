@@ -4,7 +4,14 @@ import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { SerialSettings } from "./client/settings";
 import { SerialSession } from "./client/session";
 import { getSerialBrowser } from "./client/web";
-import { closeBridge, createBridge, pollBridge, renewBridge, writeBridge } from "./shared/bridge";
+import {
+  closeBridge,
+  createBridge,
+  pollBridge,
+  renewBridge,
+  writeBridge,
+  releaseBridge,
+} from "./shared/bridge";
 
 export default function contribute(client: PluginClientContext) {
   // Each host installation owns its session independently of settings navigation.
@@ -15,6 +22,7 @@ export default function contribute(client: PluginClientContext) {
     renew: (input) => client.rpc(renewBridge, input),
     write: (input) => client.rpc(writeBridge, input),
     close: (input) => client.rpc(closeBridge, input),
+    release: (input) => client.rpc(releaseBridge, input),
   });
   const cleanup = session.mount();
   client.addSettingsScreen({

@@ -401,6 +401,66 @@ describe("browser serial example bridge", () => {
     }
   });
 
+  it("closes on host-to-browser inbound overflow instead of dropping bytes", async () => {
+    const bridge = new SerialBridge({ maxBufferedBytes: 64 });
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const socket = await connect(port);
+      sockets.push(socket);
+      const closed = new Promise<void>((resolve) => {
+        socket.once("close", () => resolve());
+      });
+      socket.write(Buffer.alloc(65, 0x41));
+      await closed;
+      expect(socket.destroyed).toBe(true);
+      await expect(bridge.poll(token)).resolves.toEqual({
+        data: "",
+        connected: false,
+        closed: true,
+      });
+      await expect(bridge.write(token, Buffer.from([1]).toString("base64"))).rejects.toThrow(
+        "Unknown bridge token",
+      );
+      // A fresh bridge works after the overflow close.
+      const second = await bridge.create();
+      await bridge.close(second.token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
+  it("closes on connected browser-to-host buffer overflow instead of dropping bytes", async () => {
+    const bridge = new SerialBridge({ maxBufferedBytes: 64 });
+    const sockets: net.Socket[] = [];
+    try {
+      const { token, port } = await bridge.create();
+      const socket = await connect(port);
+      sockets.push(socket);
+      socket.write(Buffer.from([1]));
+      const first = await bridge.poll(token);
+      expect(first.connected).toBe(true);
+      const closed = new Promise<void>((resolve) => {
+        socket.once("close", () => resolve());
+      });
+      await expect(bridge.write(token, Buffer.alloc(65, 0x41).toString("base64"))).rejects.toThrow(
+        "Bridge write buffer overflow",
+      );
+      await closed;
+      expect(socket.destroyed).toBe(true);
+      await expect(bridge.poll(token)).resolves.toEqual({
+        data: "",
+        connected: false,
+        closed: true,
+      });
+      // A fresh bridge works after the overflow close.
+      const second = await bridge.create();
+      await bridge.close(second.token);
+    } finally {
+      await dispose(bridge, sockets);
+    }
+  });
+
   it("closes the whole bridge when the host disconnects", async () => {
     const bridge = new SerialBridge();
     const sockets: net.Socket[] = [];

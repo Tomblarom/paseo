@@ -156,8 +156,14 @@ not protect against local processes using the TCP endpoint. In Docker, loopback
 belongs to the daemon's network namespace; the agent tool must run there too.
 No public listener or discovery service is started.
 
-Only one bridge and one TCP client are active per plugin installation. Each
-byte direction has a bounded buffer; overflow ends the session instead of
+Only one bridge and one TCP client are active per plugin installation. Give the
+displayed endpoint to the agent that will own the connection. Other agents must
+coordinate with that owner; concurrent clients are rejected. Do not probe the
+port with a temporary connection: closing that probe ends the device session,
+so a later tool cannot reuse the port. There is no machine-readable discovery
+endpoint or automatic handoff between tools.
+
+Each byte direction has a bounded buffer; overflow ends the session instead of
 silently dropping bytes. Device startup output is buffered while the first host
 tool connects. No listener or timer is created before a session. An active idle
 session uses bounded long polling and a separate lease heartbeat over existing RPCs.
@@ -193,8 +199,8 @@ tool process launched in a Paseo workspace terminal. Only the physical serial
 device is replaced at the hardware port. No browser globals or transports are
 monkey-patched.
 
-No physical serial device, Brave installation, native mobile device, Electron
-hardware permission flow, or encrypted relay was exercised for this feature.
+Brave, native mobile devices, Electron hardware permission flows, and encrypted
+relay transport have not been exercised for this feature.
 Synthetic echo traffic proves the byte path, not device compatibility or
 firmware-flashing support. No full USB/IP device enumeration is claimed.
 

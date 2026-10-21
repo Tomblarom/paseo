@@ -150,6 +150,37 @@ function countEvents(events: string[], name: string) {
   return events.filter((event) => event === name).length;
 }
 describe("browser serial session", () => {
+  it("keeps forwarding and retains baud rate without a settings subscriber until plugin cleanup", async () => {
+    const f = fixture();
+    let state = f.session.getSnapshot();
+    const unsubscribe = f.session.subscribe(() => {
+      state = f.session.getSnapshot();
+    });
+    f.session.setBaudRate(9600);
+    f.session.connect(state.baudRate);
+    f.opened.resolve();
+    f.created.resolve({ token: "test-token", port: 12345 });
+    await until(() => state.phase === "active");
+    unsubscribe();
+    f.session.setBaudRate(115200);
+    f.read.resolve({ done: false, value: new Uint8Array([0, 255, 128]) });
+    f.poll.resolve({ data: "AP+A", connected: true, closed: false });
+    await until(() => f.forwarded.length === 1 && f.writes.length === 1);
+    expect(f.forwarded[0]).toEqual(new Uint8Array([0, 255, 128]));
+    expect(f.writes[0]).toEqual(new Uint8Array([0, 255, 128]));
+    expect(f.session.getSnapshot()).toMatchObject({
+      phase: "active",
+      baudRate: 9600,
+      endpoint: "127.0.0.1:12345",
+      connected: true,
+    });
+    await f.unmount();
+    expect(f.session.getSnapshot()).toMatchObject({ phase: "idle", endpoint: null });
+    expect(f.events).toContain("close-port");
+    expect(f.events).toContain("close-bridge");
+    expect(f.events).toContain("cancel-heartbeat");
+    expect(f.events).toContain("remove-leave");
+  });
   it("shows permission removal progress, blocks duplicates and preserves a failed permission for retry", async () => {
     const f = fixture();
     const forgotten = deferred<void>();

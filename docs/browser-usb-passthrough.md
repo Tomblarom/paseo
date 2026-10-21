@@ -139,10 +139,11 @@ control. Opening a serial port can reset some boards.
 
 The plugin exposes an ephemeral `127.0.0.1` TCP endpoint on the daemon machine.
 Agent tools can use a normal socket client without a serial-library dependency.
-The browser must keep the settings page open. Disconnect, leaving that page,
-port errors, or host-tool disconnect ends the session. Theme changes and
-switching between wide and compact layouts can remount the settings page and
-end the session too. Browser loss expires the
+The connection belongs to the host's client plugin installation, so you can
+switch to an agent and return to settings without losing the device, endpoint,
+or chosen baud rate. Theme and layout changes also preserve the session. Keep
+the browser tab open. Disconnect, tab reload/closure, plugin teardown, port
+errors, or host-tool disconnect ends the session. Browser loss expires the
 host lease; there is no automatic reattachment. A new session requires selection
 again. Browser permission revocation is separate from ending the session; the
 screen offers Forget device when the browser provides that operation.

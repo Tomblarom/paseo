@@ -41,6 +41,7 @@ export interface BridgeRpc {
   close(input: RpcInput<typeof closeBridge>): Promise<unknown>;
 }
 export interface SerialState {
+  baudRate: number;
   phase: "idle" | "connecting" | "active" | "stopping" | "forgetting";
   label: string;
   endpoint: string | null;
@@ -70,6 +71,7 @@ function scheduleHeartbeat(callback: () => void): () => void {
 
 export class SerialSession {
   private state: SerialState = {
+    baudRate: 115200,
     phase: "idle",
     label: "No device selected",
     endpoint: null,
@@ -99,18 +101,21 @@ export class SerialSession {
     });
     return () => {
       remove();
-      void this.stop();
+      return this.stop();
     };
   }
   private update(patch: Partial<SerialState>) {
     this.state = { ...this.state, ...patch };
     for (const listener of this.listeners) listener();
   }
+  setBaudRate(baudRate: number) {
+    if (this.state.phase === "idle") this.update({ baudRate });
+  }
   connect(baudRate: number): void {
     if (this.run || this.state.phase !== "idle" || this.browser.unavailable) return;
     const run: Run = { stopped: false, initialized: Promise.resolve() };
     this.run = run;
-    this.update({ phase: "connecting", error: null, canForget: false });
+    this.update({ phase: "connecting", baudRate, error: null, canForget: false });
     // Preserve the button's user activation: requestPort must precede any await.
     let selection: Promise<SerialPort>;
     try {

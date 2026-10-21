@@ -5,6 +5,7 @@ import { connectNewWorkspaceDaemonClient } from "./new-workspace";
 import { gotoAppShell, openSettings } from "./app";
 import { openCompactSettings, openHostSection } from "./settings";
 import { getServerId } from "./server-id";
+import { openMobileAgentSidebar } from "./sidebar";
 import { expect, type Page } from "../fixtures";
 import { TerminalE2EHarness } from "./terminal-dsl";
 
@@ -18,18 +19,15 @@ export async function installBrowserSerial(
     if (hardware !== "browser") {
       // Inject only the typed hardware port; retain production UI, controller,
       // WebSocket transport, daemon RPC handlers, and host TCP sockets.
-      const file = path.join(example.directory, "client/settings.tsx");
+      const file = path.join(example.directory, "index.client.tsx");
       const source = await readFile(file, "utf8");
       const injected = source
-        .replace('from "./web"', 'from "./serial-browser.fake"')
+        .replace('from "./client/web"', 'from "./client/serial-browser.fake"')
         .replace(
           "import { getSerialBrowser }",
           "import { getFakeSerialBrowser as getSerialBrowser }",
         )
-        .replace(
-          "useMemo(getSerialBrowser, [])",
-          `useMemo(() => getSerialBrowser("${hardware}"), [])`,
-        );
+        .replace("getSerialBrowser()", `getSerialBrowser("${hardware}")`);
       if (!injected.includes("import { getFakeSerialBrowser as getSerialBrowser }"))
         throw new Error("Synthetic serial hardware was not injected");
       await writeFile(file, injected);
@@ -62,8 +60,15 @@ export async function openBrowserSerial(page: Page, compact = false) {
   await expect(page.getByText("Browser USB serial experiment", { exact: true })).toBeVisible();
 }
 
-export async function startSerialAgentTool(page: Page) {
-  const text = await page.getByText(/^Host TCP: 127\.0\.0\.1:\d+$/).textContent();
+export async function openBrowserSerialFromSidebar(page: Page, compact = false) {
+  await gotoAppShell(page);
+  if (compact) await openMobileAgentSidebar(page);
+  await page.getByRole("button", { name: "USB serial", exact: true }).click();
+  await expect(page.getByText("Browser USB serial experiment", { exact: true })).toBeVisible();
+}
+
+export async function startSerialAgentTool(page: Page, endpoint?: string) {
+  const text = endpoint ?? (await page.getByText(/^Host TCP: 127\.0\.0\.1:\d+$/).textContent());
   const port = Number(text?.match(/:(\d+)$/)?.[1]);
   if (!port) throw new Error("Missing serial TCP endpoint");
   const terminal = await TerminalE2EHarness.create({ tempPrefix: "browser-serial-tool-" });
@@ -88,7 +93,7 @@ socket.on('data', chunk => {
   }
 });
 socket.on('close', () => { if(stage===2) fs.writeFileSync(output,'tool disconnected'); });
-setTimeout(() => { socket.destroy(); }, 25000).unref();
+setTimeout(() => { socket.destroy(); }, 60000).unref();
 `;
   try {
     await terminal.createTerminal({

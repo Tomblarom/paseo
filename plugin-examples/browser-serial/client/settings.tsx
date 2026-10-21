@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useRpc, type PluginSurfaceProps } from "@getpaseo/plugin/client";
+import { useCallback, useSyncExternalStore } from "react";
+import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import {
   SettingsAction,
   SettingsCard,
@@ -7,30 +7,24 @@ import {
   SettingsSection,
   SettingsSelect,
 } from "@getpaseo/plugin/client/ui";
-import { closeBridge, createBridge, pollBridge, renewBridge, writeBridge } from "../shared/bridge";
-import { SerialSession } from "./session";
-import { getSerialBrowser } from "./web";
+import type { SerialBrowser, SerialSession } from "./session";
 
 const baudRates = [9600, 19200, 38400, 57600, 115200].map((rate) => ({
   label: String(rate),
   value: String(rate),
 }));
 
-export function SerialSettings({ host }: PluginSurfaceProps) {
-  const create = useRpc(createBridge);
-  const poll = useRpc(pollBridge);
-  const renew = useRpc(renewBridge);
-  const write = useRpc(writeBridge);
-  const close = useRpc(closeBridge);
-  const browser = useMemo(getSerialBrowser, []);
-  const session = useMemo(
-    () => new SerialSession(browser, { create, poll, renew, write, close }),
-    [browser, create, poll, renew, write, close],
-  );
+export function SerialSettings({
+  host,
+  browser,
+  session,
+}: PluginSurfaceProps & {
+  browser: SerialBrowser;
+  session: SerialSession;
+}) {
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
-  const [baudRate, setBaudRate] = useState("115200");
-  useEffect(() => session.mount(), [session]);
-  const connect = useCallback(() => session.connect(Number(baudRate)), [session, baudRate]);
+  const connect = useCallback(() => session.connect(state.baudRate), [session, state.baudRate]);
+  const setBaudRate = useCallback((value: string) => session.setBaudRate(Number(value)), [session]);
   const disconnect = useCallback(() => {
     void session.stop();
   }, [session]);
@@ -46,14 +40,14 @@ export function SerialSettings({ host }: PluginSurfaceProps) {
         />
         <SettingsRow
           label={`Forward to ${host.label}`}
-          hint="Only connect a device you want this host to control. Trusted processes on that host can access the temporary TCP port. Keep this settings page open; leaving disconnects the device. No automatic reconnect."
+          hint="Only connect a device you want this host to control. Trusted processes on that host can access the temporary TCP port. You can switch to your agent and return here. Keep this browser tab open; closing or reloading it disconnects the device. No automatic reconnect."
         />
         {browser.unavailable ? (
           <SettingsRow label="Browser unavailable" hint={browser.unavailable} />
         ) : null}
         <SettingsSelect
           label="Baud rate"
-          value={baudRate}
+          value={String(state.baudRate)}
           options={baudRates}
           onValueChange={setBaudRate}
           disabled={state.phase !== "idle"}

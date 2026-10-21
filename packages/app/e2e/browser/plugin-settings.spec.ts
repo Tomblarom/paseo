@@ -21,6 +21,7 @@ import { test as serialTest, expect } from "../support/fixtures";
 import {
   installBrowserSerial,
   openBrowserSerial,
+  openBrowserSerialFromSidebar,
   startSerialAgentTool,
 } from "../support/helpers/browser-serial";
 
@@ -29,7 +30,7 @@ serialTest(
   async ({ page }, testInfo) => {
     const plugin = await installBrowserSerial("browser");
     try {
-      await openBrowserSerial(page);
+      await openBrowserSerialFromSidebar(page);
       await expect(page.getByText("No device selected", { exact: true })).toBeVisible();
       await expect(page.getByText(/^Host TCP:/)).toHaveCount(0);
       await page.screenshot({ path: testInfo.outputPath("serial-idle.png") });
@@ -44,8 +45,6 @@ for (const viewport of [
   { name: "compact", width: 390, height: 844 },
 ]) {
   serialTest.describe(`browser serial ${viewport.name}`, () => {
-    // Changing layout shells remounts settings and intentionally ends sessions.
-    // Exercise each shell from the start rather than resizing an active session.
     serialTest.use({ viewport: { width: viewport.width, height: viewport.height } });
     serialTest(
       "browser serial forwards a synthetic USB port to a real host tool and disconnects",
@@ -54,7 +53,7 @@ for (const viewport of [
         let tool: Awaited<ReturnType<typeof startSerialAgentTool>> | undefined;
         try {
           await page.emulateMedia({ colorScheme: "dark" });
-          await openBrowserSerial(page, viewport.name === "compact");
+          await openBrowserSerialFromSidebar(page, viewport.name === "compact");
           await page
             .getByRole("button", { name: "Choose and forward device", exact: true })
             .click();
@@ -84,16 +83,45 @@ for (const viewport of [
 }
 
 serialTest(
-  "browser serial closes the host tool when its settings screen unmounts",
-  async ({ page }) => {
+  "browser serial keeps forwarding while away and restores its session on return",
+  async ({ page }, testInfo) => {
     const plugin = await installBrowserSerial("echo");
     let tool: Awaited<ReturnType<typeof startSerialAgentTool>> | undefined;
     try {
       await openBrowserSerial(page);
+      await page.getByRole("button", { name: "Baud rate: 115200", exact: true }).click();
+      await page.getByRole("menuitem", { name: "9600", exact: true }).click();
       await page.getByRole("button", { name: "Choose and forward device", exact: true }).click();
-      tool = await startSerialAgentTool(page);
+      const endpoint = await page.getByText(/^Host TCP: 127\.0\.0\.1:/).textContent();
+      if (!endpoint) throw new Error("Missing serial TCP endpoint");
       await page.getByRole("button", { name: "Back to plugins", exact: true }).click();
+      await page.getByTestId("settings-back-to-workspace").click();
+      await expect(page.getByRole("button", { name: "USB serial", exact: true })).toBeVisible();
+      await page.screenshot({ path: testInfo.outputPath("serial-sidebar.png") });
+      // Connect and transfer bytes while the device screen is unmounted.
+      tool = await startSerialAgentTool(page, endpoint);
+      await page.getByRole("button", { name: "USB serial", exact: true }).click();
+      await expect(page.getByText(endpoint, { exact: true })).toBeVisible();
+      await expect(page.getByText("USB 1209:0001", { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Baud rate: 9600", exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByText("Host tool connected. Binary data flows in both directions."),
+      ).toBeVisible();
+      await page.emulateMedia({ colorScheme: "light" });
+      await expect(page.getByText(endpoint, { exact: true })).toBeVisible();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.getByText(endpoint, { exact: true })).toBeVisible();
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await expect(page.getByText(endpoint, { exact: true })).toBeVisible();
+      await page.screenshot({ path: testInfo.outputPath("serial-return.png") });
+      await page.reload();
       await tool.expectDisconnected();
+      await expect(page.getByText(/^Host TCP:/)).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Choose and forward device", exact: true }),
+      ).toBeEnabled();
     } finally {
       await tool?.cleanup();
       await plugin.cleanup();
